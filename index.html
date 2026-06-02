@@ -15,6 +15,15 @@
   <meta name="apple-mobile-web-app-title" content="Keuangan" />
 
   <link rel="stylesheet" href="css/style.css" />
+
+  <script>
+    // Tangkap event "installable" Chrome sedini mungkin (untuk tombol "Pasang").
+    window.addEventListener("beforeinstallprompt", function (e) {
+      e.preventDefault();
+      window.__kkDeferredPrompt = e;
+      window.dispatchEvent(new Event("kk-installable"));
+    });
+  </script>
 </head>
 <body>
   <noscript><p style="padding:1rem">Aplikasi ini membutuhkan JavaScript yang aktif.</p></noscript>
@@ -183,6 +192,7 @@
   <script src="js/summary.js"></script>
   <script src="js/advice.js"></script>
   <script src="js/app.js"></script>
+  <script src="js/install.js"></script>
 
   <script>
     // Daftarkan service worker untuk dukungan "Add to Home Screen" & offline.

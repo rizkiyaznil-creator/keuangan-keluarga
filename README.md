@@ -121,6 +121,10 @@ scripts/generate_icons.py  Skrip pembuat ikon (opsional)
 - **Android (Chrome)**: buka situs → menu ⋮ → **Add to Home screen / Install app**.
 - **iPhone (Safari)**: buka situs → tombol **Share** → **Add to Home Screen**.
 
+> Aplikasi juga menampilkan **petunjuk pasang otomatis**: tombol **"Pasang"** di
+> Android/Chrome (& desktop), dan **banner langkah** di iPhone/iPad. Petunjuk ini
+> hilang setelah ditutup atau setelah aplikasi terpasang.
+
 ---
 
 ## 🧪 Menjalankan secara lokal (opsional)

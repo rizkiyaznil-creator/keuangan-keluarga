@@ -1,7 +1,7 @@
 // Service worker sederhana agar aplikasi bisa "Add to Home Screen" dan tetap
 // dapat dibuka saat offline. Strategi: network-first untuk file aplikasi
 // (selalu ambil versi terbaru saat online), dengan cache sebagai cadangan.
-const CACHE = "kk-cache-v1";
+const CACHE = "kk-cache-v2";
 const SHELL = [
   "./",
   "./index.html",
@@ -14,6 +14,7 @@ const SHELL = [
   "./js/summary.js",
   "./js/advice.js",
   "./js/app.js",
+  "./js/install.js",
   "./manifest.webmanifest",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
