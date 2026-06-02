@@ -1,20 +1,16 @@
 // ============================================================================
-//  KONFIGURASI SUPABASE  —  ISI BAGIAN INI SEBELUM MENJALANKAN APLIKASI
-// ============================================================================
-//  Langkah:
-//   1. Buka Supabase Dashboard -> pilih project Anda.
-//   2. Masuk ke "Project Settings" -> "API" (atau "Data API").
-//   3. Salin "Project URL"  -> tempel ke SUPABASE_URL.
-//   4. Salin kunci "anon public" -> tempel ke SUPABASE_ANON_KEY.
+//  KONFIGURASI SUPABASE
+// ----------------------------------------------------------------------------
+//  Nilai di bawah sudah diisi. Bila suatu saat berganti project Supabase,
+//  ganti SUPABASE_URL dan SUPABASE_ANON_KEY sesuai project baru
+//  (Project Settings -> API).
 //
-//  CATATAN KEAMANAN (penting):
-//   URL dan "anon key" ini MEMANG bersifat publik dan aman untuk ditaruh di
-//   kode frontend. Keamanan & privasi data dijaga oleh Row Level Security (RLS)
-//   di database Supabase (lihat supabase/schema.sql), BUKAN oleh kerahasiaan
-//   kunci ini.
+//  CATATAN KEAMANAN: URL dan anon/publishable key memang bersifat PUBLIK dan
+//  aman ditaruh di kode frontend. Keamanan & privasi data dijaga oleh
+//  Row Level Security (RLS) di database (lihat supabase/schema.sql).
 // ============================================================================
 
 window.KK_CONFIG = {
-  SUPABASE_URL: "ISI_SUPABASE_URL_DI_SINI",            // contoh: https://abcdwxyz.supabase.co
-  SUPABASE_ANON_KEY: "ISI_SUPABASE_ANON_KEY_DI_SINI"   // contoh: eyJhbGciOi...
+  SUPABASE_URL: "https://aqmpjjccycgbclvnxpqb.supabase.co",
+  SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFxbXBqamNjeWNnYmNsdm54cHFiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzNzU2OTUsImV4cCI6MjA5NTk1MTY5NX0.L0Nr9df1BXaVRZX3hGwE8HPPTKotfgGHxe4ePzEGkUI"
 };
