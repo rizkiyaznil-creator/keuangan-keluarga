@@ -1,0 +1,16 @@
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# Logs
+*.log
+npm-debug.log*
+
+# Catatan: js/config.js SENGAJA tidak di-ignore. Isinya hanya URL + anon key
+# Supabase yang memang publik dan dilindungi oleh Row Level Security.

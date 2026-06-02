@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="description" content="Pencatat keuangan keluarga: pemasukan, pengeluaran, ringkasan, dan saran keuangan sehat." />
+  <meta name="theme-color" content="#0f766e" />
+  <title>Keuangan Keluarga</title>
+
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Keuangan" />
+
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <noscript><p style="padding:1rem">Aplikasi ini membutuhkan JavaScript yang aktif.</p></noscript>
+
+  <!-- Peringatan bila config.js belum diisi -->
+  <div id="configWarning" class="config-warning hidden">
+    <div class="config-card">
+      <h1>⚙️ Konfigurasi diperlukan</h1>
+      <p>Aplikasi belum terhubung ke Supabase. Buka berkas <code>js/config.js</code> lalu isi
+        <code>SUPABASE_URL</code> dan <code>SUPABASE_ANON_KEY</code>.</p>
+      <p class="muted">Panduan lengkap ada di <code>README.md</code>.</p>
+    </div>
+  </div>
+
+  <!-- ================= AUTENTIKASI ================= -->
+  <div id="viewAuth" class="auth hidden">
+    <div class="auth-card">
+      <div class="brand brand-center">
+        <img src="icons/icon-192.png" alt="" class="brand-logo" width="56" height="56" />
+        <div>
+          <h1 class="brand-name">Keuangan Keluarga</h1>
+          <p class="brand-tag">Catat, pantau, dan rencanakan bersama</p>
+        </div>
+      </div>
+
+      <div class="auth-tabs">
+        <button class="auth-tab active" data-target="paneLogin" type="button">Masuk</button>
+        <button class="auth-tab" data-target="paneRegister" type="button">Daftar</button>
+      </div>
+
+      <!-- LOGIN -->
+      <div id="paneLogin" class="auth-pane">
+        <form id="loginForm" class="form" autocomplete="on">
+          <label class="field">
+            <span class="field-label">Email</span>
+            <input id="loginEmail" class="input" type="email" autocomplete="email" placeholder="nama@email.com" required />
+          </label>
+          <label class="field">
+            <span class="field-label">Password</span>
+            <input id="loginPassword" class="input" type="password" autocomplete="current-password" placeholder="••••••" required />
+          </label>
+          <button id="loginBtn" class="btn btn-primary btn-block" type="submit">Masuk</button>
+          <div class="auth-links">
+            <a href="#" data-goto="paneForgot">Lupa password?</a>
+            <a href="#" data-goto="paneRegister">Belum punya akun? Daftar</a>
+          </div>
+        </form>
+      </div>
+
+      <!-- DAFTAR -->
+      <div id="paneRegister" class="auth-pane hidden">
+        <form id="registerForm" class="form" autocomplete="on">
+          <label class="field">
+            <span class="field-label">Nama tampilan</span>
+            <input id="regName" class="input" type="text" placeholder="cth: Budi" required />
+          </label>
+          <label class="field">
+            <span class="field-label">Email</span>
+            <input id="regEmail" class="input" type="email" autocomplete="email" placeholder="nama@email.com" required />
+          </label>
+          <label class="field">
+            <span class="field-label">Password</span>
+            <input id="regPassword" class="input" type="password" autocomplete="new-password" placeholder="Minimal 6 karakter" required />
+          </label>
+
+          <div class="field">
+            <span class="field-label">Keluarga</span>
+            <div class="radio-row">
+              <label class="radio"><input type="radio" name="famMode" value="create" checked /><span>Buat keluarga baru</span></label>
+              <label class="radio"><input type="radio" name="famMode" value="join" /><span>Gabung keluarga</span></label>
+            </div>
+          </div>
+
+          <div id="regCreateBox">
+            <label class="field">
+              <span class="field-label">Nama keluarga</span>
+              <input id="regFamilyName" class="input" type="text" placeholder="cth: Keluarga Santoso" />
+            </label>
+            <p class="hint">Anda akan menjadi Admin/Kepala Keluarga dan mendapat kode undangan unik.</p>
+          </div>
+
+          <div id="regJoinBox" class="hidden">
+            <label class="field">
+              <span class="field-label">Kode keluarga</span>
+              <input id="regInviteCode" class="input" type="text" placeholder="cth: AB3KZ9" style="text-transform:uppercase" />
+            </label>
+            <p class="hint">Minta kode ini kepada Admin keluarga Anda.</p>
+          </div>
+
+          <button id="registerBtn" class="btn btn-primary btn-block" type="submit">Daftar</button>
+          <div class="auth-links">
+            <a href="#" data-goto="paneLogin">Sudah punya akun? Masuk</a>
+          </div>
+        </form>
+      </div>
+
+      <!-- LUPA PASSWORD -->
+      <div id="paneForgot" class="auth-pane hidden">
+        <form id="forgotForm" class="form">
+          <p class="muted">Masukkan email Anda. Kami akan mengirim tautan untuk menyetel ulang password.</p>
+          <label class="field">
+            <span class="field-label">Email</span>
+            <input id="forgotEmail" class="input" type="email" placeholder="nama@email.com" required />
+          </label>
+          <button id="forgotBtn" class="btn btn-primary btn-block" type="submit">Kirim Tautan</button>
+          <div class="auth-links"><a href="#" data-goto="paneLogin">Kembali ke Masuk</a></div>
+        </form>
+      </div>
+
+      <!-- SETEL ULANG PASSWORD -->
+      <div id="paneReset" class="auth-pane hidden">
+        <form id="resetForm" class="form">
+          <p class="muted">Buat password baru untuk akun Anda.</p>
+          <label class="field">
+            <span class="field-label">Password baru</span>
+            <input id="resetPassword" class="input" type="password" autocomplete="new-password" placeholder="Minimal 6 karakter" required />
+          </label>
+          <label class="field">
+            <span class="field-label">Ulangi password baru</span>
+            <input id="resetPassword2" class="input" type="password" autocomplete="new-password" placeholder="Ulangi" required />
+          </label>
+          <button id="resetBtn" class="btn btn-primary btn-block" type="submit">Simpan Password</button>
+        </form>
+      </div>
+
+      <!-- LENGKAPI SETUP (dirender via JS) -->
+      <div id="paneComplete" class="auth-pane hidden"></div>
+    </div>
+  </div>
+
+  <!-- ================= APLIKASI ================= -->
+  <div id="appShell" class="app hidden">
+    <header class="appbar">
+      <div class="appbar-brand">
+        <img src="icons/icon-192.png" alt="" width="28" height="28" class="appbar-logo" />
+        <div class="appbar-titles">
+          <strong>Keuangan Keluarga</strong>
+          <span id="brandFamily" class="appbar-sub"></span>
+        </div>
+      </div>
+      <button id="accountBtn" class="account-btn" type="button">
+        <span id="acctName" class="acct-name"></span>
+        <span id="roleChip" class="chip"></span>
+      </button>
+    </header>
+
+    <main id="main" class="main"></main>
+
+    <nav class="bottom-nav">
+      <button class="nav-item" data-nav="summary" type="button"><span class="nav-ic">📊</span><span class="nav-tx">Ringkasan</span></button>
+      <button class="nav-item" data-nav="advice" type="button"><span class="nav-ic">💡</span><span class="nav-tx">Saran</span></button>
+      <button class="nav-item nav-add" data-nav="add" type="button"><span class="nav-ic">＋</span><span class="nav-tx">Tambah</span></button>
+      <button class="nav-item" data-nav="categories" type="button"><span class="nav-ic">🏷️</span><span class="nav-tx">Kategori</span></button>
+      <button class="nav-item hidden" data-nav="family" type="button"><span class="nav-ic">👨‍👩‍👧</span><span class="nav-tx">Keluarga</span></button>
+    </nav>
+  </div>
+
+  <!-- Library Supabase (CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- Kode aplikasi (urutan penting) -->
+  <script src="js/config.js"></script>
+  <script src="js/supabase.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/summary.js"></script>
+  <script src="js/advice.js"></script>
+  <script src="js/app.js"></script>
+
+  <script>
+    // Daftarkan service worker untuk dukungan "Add to Home Screen" & offline.
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("service-worker.js").catch(() => {});
+      });
+    }
+  </script>
+</body>
+</html>
