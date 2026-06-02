@@ -191,6 +191,25 @@ code { background: #e2e8f0; padding: .1rem .35rem; border-radius: 6px; font-size
 .pos { color: var(--green); }
 .neg { color: var(--red); }
 
+/* Tabel transaksi + ekspor */
+.card-head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; flex-wrap: wrap; margin-bottom: .6rem; }
+.card-head .card-title { margin: 0; }
+.count-badge { font-size: .72rem; font-weight: 700; color: var(--muted); background: #f1f5f9; padding: .18rem .55rem; border-radius: 999px; }
+.export-row { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: .85rem; }
+.table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.tx-table { width: 100%; border-collapse: collapse; font-size: .88rem; }
+.tx-table th { text-align: left; font-size: .68rem; text-transform: uppercase; letter-spacing: .03em; color: var(--muted); font-weight: 700; padding: .45rem .5rem; border-bottom: 2px solid var(--border); white-space: nowrap; }
+.tx-table td { padding: .55rem .5rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+.tx-table tr:last-child td { border-bottom: none; }
+.tx-table .ta-right { text-align: right; }
+.td-date { white-space: nowrap; color: var(--muted); }
+.td-cat { font-weight: 600; }
+.td-note { font-size: .78rem; color: var(--muted); margin-top: .1rem; }
+.td-who { white-space: nowrap; color: var(--teal-700); font-weight: 600; }
+.td-amt { white-space: nowrap; font-weight: 800; }
+.tx-trow.clickable { cursor: pointer; }
+.tx-trow.clickable:hover td { background: #f8fafc; }
+
 /* Kategori */
 .cat-row { display: flex; align-items: center; justify-content: space-between; gap: .5rem; padding: .55rem 0; border-bottom: 1px solid var(--border); }
 .cat-row:last-child { border-bottom: none; }

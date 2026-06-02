@@ -16,7 +16,8 @@ layar utama HP ("Add to Home Screen") karena sudah berupa PWA.
   - **Admin/Kepala Keluarga** melihat data **semua anggota** (total gabungan &
     rincian per anggota), namun **tidak bisa mengubah** transaksi anggota lain.
 - **Ringkasan bulanan**: total pemasukan, pengeluaran, saldo, grafik pengeluaran
-  per kategori, dan daftar transaksi terbaru.
+  per kategori, dan **tabel semua transaksi** yang bisa **diekspor ke CSV**
+  (langsung terbuka di Google Sheets / Excel).
 - **Kelola kategori** keluarga (tambah/edit/hapus), dengan kategori default
   otomatis saat keluarga dibuat.
 - **Saran keuangan sehat** berbasis data (rasio tabungan, rasio pengeluaran,

@@ -183,12 +183,17 @@ KK.app = (function () {
     return bar;
   }
 
+  function scopeUserId() {
+    if (isAdmin()) {
+      if (state.scope === "self") return state.user.id;
+      if (state.memberFilter) return state.memberFilter;
+    }
+    return null;
+  }
   function scopeForFetch() {
     const opts = { month: state.month };
-    if (isAdmin()) {
-      if (state.scope === "self") opts.userId = state.user.id;
-      else if (state.memberFilter) opts.userId = state.memberFilter;
-    }
+    const uid = scopeUserId();
+    if (uid) opts.userId = uid;
     return opts;
   }
 
@@ -205,8 +210,16 @@ KK.app = (function () {
       KK.summary.render(body, {
         transactions: txs,
         memberMap: state.memberMap,
+        month: state.month,
         showWho: isAdmin() && state.scope === "family" && !state.memberFilter,
         onEditTx: (t) => { if (t.user_id === state.user.id) openTxModal(t); else viewOnlyTx(t); },
+        onExportAll: async () => {
+          try {
+            const uid = scopeUserId();
+            const all = await KK.db.listTransactions(uid ? { userId: uid } : {});
+            KK.summary.exportTransactions(all, state.memberMap, "keuangan_semua.csv");
+          } catch (err) { u.toast(KK.auth.friendly(err), "error"); }
+        },
       });
     } catch (err) { errorBox(main, err); }
   }

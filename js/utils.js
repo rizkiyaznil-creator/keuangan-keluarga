@@ -173,11 +173,47 @@ KK.util = (function () {
     });
   }
 
+  function downloadCSV(filename, headers, rows) {
+    const esc = (v) => {
+      const s = v == null ? "" : String(v);
+      return /[",\n\r;]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+    };
+    const lines = [headers.map(esc).join(",")];
+    rows.forEach((r) => lines.push(r.map(esc).join(",")));
+    const csv = "﻿" + lines.join("\r\n"); // BOM agar Excel membaca UTF-8 dengan benar
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+
+    // Coba bagikan berkas (bagus di HP: kirim ke Drive/Sheets/Email), jika tidak
+    // didukung -> unduh biasa (bagus di desktop).
+    const tryShare = async () => {
+      try {
+        if (navigator.canShare && typeof File !== "undefined") {
+          const file = new File([blob], filename, { type: "text/csv" });
+          if (navigator.canShare({ files: [file] })) {
+            await navigator.share({ files: [file], title: filename });
+            return true;
+          }
+        }
+      } catch (e) {
+        if (e && e.name === "AbortError") return true; // pengguna membatalkan
+      }
+      return false;
+    };
+    tryShare().then((shared) => {
+      if (shared) return;
+      const url = URL.createObjectURL(blob);
+      const a = el("a", { href: url, download: filename });
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 150);
+    });
+  }
+
   return {
     formatRupiah, formatNumber, parseNumber,
     todayISO, currentMonth, formatTanggal, formatTanggalPanjang, formatBulan,
     monthRange, prevMonth, ymd,
     $, $$, el, escapeHtml, clear, attachThousandsInput, setLoading,
-    toast, openModal, confirmDialog,
+    toast, openModal, confirmDialog, downloadCSV,
   };
 })();

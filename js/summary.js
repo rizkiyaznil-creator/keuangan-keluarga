@@ -99,23 +99,87 @@ KK.summary = (function () {
       renderChart(r.byCategory),
     ]));
 
-    const recent = txs.slice(0, 12);
-    const list = u2.el("div", { class: "tx-list" });
-    if (!recent.length) {
-      list.appendChild(u2.el("p", { class: "muted", text: "Belum ada transaksi pada periode ini." }));
-    } else {
-      recent.forEach((t) => {
-        const who = data.showWho && data.memberMap ? (data.memberMap[t.user_id] || "—") : null;
-        list.appendChild(txRow(t, { who, onClick: data.onEditTx }));
-      });
-    }
-    container.appendChild(u2.el("section", { class: "card" }, [
-      u2.el("h3", { class: "card-title", text: "Transaksi Terbaru" }),
-      list,
+    // Tabel semua transaksi + tombol ekspor
+    const section = u2.el("section", { class: "card" });
+    section.appendChild(u2.el("div", { class: "card-head" }, [
+      u2.el("h3", { class: "card-title", text: "Semua Transaksi" }),
+      u2.el("span", { class: "count-badge", text: txs.length + " transaksi" }),
     ]));
+
+    const exportRow = u2.el("div", { class: "export-row" });
+    if (txs.length) {
+      exportRow.appendChild(u2.el("button", {
+        class: "btn btn-ghost btn-sm",
+        text: "⬇️ Ekspor bulan ini",
+        onClick: () => exportTransactions(txs, data.memberMap, "keuangan_" + (data.month || "data") + ".csv"),
+      }));
+    }
+    if (data.onExportAll) {
+      exportRow.appendChild(u2.el("button", {
+        class: "btn btn-ghost btn-sm",
+        text: "⬇️ Ekspor semua bulan",
+        onClick: () => data.onExportAll(),
+      }));
+    }
+    if (exportRow.childNodes.length) section.appendChild(exportRow);
+
+    if (!txs.length) {
+      section.appendChild(u2.el("p", { class: "muted", text: "Belum ada transaksi pada periode ini." }));
+    } else {
+      section.appendChild(renderTable(txs, data));
+    }
+    container.appendChild(section);
 
     return r;
   }
 
-  return { compute, render, txRow };
+  function renderTable(txs, data) {
+    const showWho = !!data.showWho;
+    const memberMap = data.memberMap || {};
+    const thead = u.el("thead", {}, [
+      u.el("tr", {}, [
+        u.el("th", { text: "Tgl" }),
+        u.el("th", { text: "Uraian" }),
+        showWho ? u.el("th", { text: "Anggota" }) : null,
+        u.el("th", { class: "ta-right", text: "Jumlah" }),
+      ]),
+    ]);
+    const tbody = u.el("tbody");
+    txs.forEach((t) => {
+      const isIncome = t.type === "income";
+      const tr = u.el("tr", { class: "tx-trow" }, [
+        u.el("td", { class: "td-date", text: u.formatTanggal(t.tx_date) }),
+        u.el("td", {}, [
+          u.el("div", { class: "td-cat", text: t.category_name || (isIncome ? "Pemasukan" : "Tanpa kategori") }),
+          t.note ? u.el("div", { class: "td-note", text: t.note }) : null,
+        ]),
+        showWho ? u.el("td", { class: "td-who", text: memberMap[t.user_id] || "—" }) : null,
+        u.el("td", { class: "td-amt ta-right " + (isIncome ? "pos" : "neg"),
+          text: (isIncome ? "+ " : "− ") + u.formatRupiah(t.amount) }),
+      ]);
+      if (data.onEditTx) {
+        tr.classList.add("clickable");
+        tr.addEventListener("click", () => data.onEditTx(t));
+      }
+      tbody.appendChild(tr);
+    });
+    return u.el("div", { class: "table-wrap" }, [u.el("table", { class: "tx-table" }, [thead, tbody])]);
+  }
+
+  function exportTransactions(txs, memberMap, filename) {
+    if (!txs || !txs.length) { u.toast("Tidak ada transaksi untuk diekspor.", "warn"); return; }
+    const headers = ["Tanggal", "Jenis", "Kategori", "Anggota", "Catatan", "Jumlah"];
+    const rows = txs.map((t) => [
+      t.tx_date,
+      t.type === "income" ? "Pemasukan" : "Pengeluaran",
+      t.category_name || "",
+      (memberMap && memberMap[t.user_id]) || "",
+      t.note || "",
+      Math.round(Number(t.amount) || 0),
+    ]);
+    u.downloadCSV(filename || "keuangan.csv", headers, rows);
+    u.toast(rows.length + " transaksi diekspor ke CSV.", "success");
+  }
+
+  return { compute, render, txRow, renderTable, exportTransactions };
 })();
