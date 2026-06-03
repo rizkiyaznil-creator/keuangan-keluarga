@@ -121,7 +121,7 @@ KK.db = (function () {
   }
 
   // ---------------- TRANSAKSI ----------------
-  const TX_COLS = "id, family_id, user_id, type, category_id, amount, note, tx_date, created_at, categories(name)";
+  const TX_COLS = "id, family_id, user_id, type, category_id, amount, note, tx_date, editable_until, created_at, categories(name)";
 
   function normalizeTx(row) {
     return Object.assign({}, row, {
@@ -175,6 +175,10 @@ KK.db = (function () {
     const { error } = await sb().from("transactions").delete().eq("id", id);
     if (error) throw error;
   }
+  // Admin membuka kunci transaksi final (memberi pemilik jendela edit, default 7 hari).
+  async function adminUnlock(id, days) {
+    return unwrap(await sb().rpc("admin_unlock_transaction", { p_tx_id: id, p_days: days || 7 }));
+  }
 
   return {
     setContext, getContext,
@@ -183,6 +187,6 @@ KK.db = (function () {
     createFamily, joinFamily,
     getProfile, getFamily, updateDisplayName, getMembers,
     listCategories, addCategory, updateCategory, deleteCategory,
-    listTransactions, getTransaction, addTransaction, updateTransaction, deleteTransaction,
+    listTransactions, getTransaction, addTransaction, updateTransaction, deleteTransaction, adminUnlock,
   };
 })();

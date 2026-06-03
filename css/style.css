@@ -234,6 +234,7 @@ code { background: #e2e8f0; padding: .1rem .35rem; border-radius: 6px; font-size
 .cat-group-name { font-weight: 700; }
 .cat-group-count { color: var(--muted); font-weight: 600; font-size: .85rem; }
 .cat-group-total { font-weight: 800; white-space: nowrap; }
+.lock-badge { font-size: .85em; opacity: .6; }
 
 /* Kategori */
 .cat-row { display: flex; align-items: center; justify-content: space-between; gap: .5rem; padding: .55rem 0; border-bottom: 1px solid var(--border); }

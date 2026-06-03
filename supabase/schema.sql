@@ -9,10 +9,12 @@
 --  Ringkasan aturan privasi yang ditegakkan di sini (bukan hanya di frontend):
 --    - Anggota biasa  : HANYA bisa melihat & menulis transaksi MILIKNYA.
 --    - Admin/Kepala    : bisa MELIHAT transaksi SEMUA anggota sefamili,
---                        tetapi TETAP hanya bisa menulis transaksi miliknya.
+--                        tetapi TETAP hanya bisa menulis transaksi miliknya
+--                        (boleh menghapus & membuka-kunci transaksi sefamili).
 --    - Kategori        : milik keluarga (boleh dikelola anggota keluarga).
---    - Pendaftaran     : lewat fungsi RPC aman (create_family / join_family)
---                        agar tidak ada kebocoran data antar-keluarga.
+--    - Penguncian      : transaksi terkunci (final) setelah tenggat
+--                        (lihat fungsi tx_is_open di bawah).
+--    - Pendaftaran     : lewat fungsi RPC aman (create_family / join_family).
 -- ============================================================================
 
 -- ---------------------------------------------------------------------------
@@ -43,15 +45,16 @@ create table if not exists public.categories (
 );
 
 create table if not exists public.transactions (
-  id          uuid primary key default gen_random_uuid(),
-  family_id   uuid not null references public.families (id) on delete cascade,
-  user_id     uuid not null references auth.users (id) on delete cascade,
-  type        text not null check (type in ('income', 'expense')),
-  category_id uuid references public.categories (id) on delete set null,
-  amount      numeric(14, 2) not null check (amount >= 0),
-  note        text,
-  tx_date     date not null default current_date,
-  created_at  timestamptz not null default now()
+  id             uuid primary key default gen_random_uuid(),
+  family_id      uuid not null references public.families (id) on delete cascade,
+  user_id        uuid not null references auth.users (id) on delete cascade,
+  type           text not null check (type in ('income', 'expense')),
+  category_id    uuid references public.categories (id) on delete set null,
+  amount         numeric(14, 2) not null check (amount >= 0),
+  note           text,
+  tx_date        date not null default current_date,
+  editable_until timestamptz,                 -- diisi saat admin "membuka kunci"
+  created_at     timestamptz not null default now()
 );
 
 create index if not exists idx_profiles_family      on public.profiles (family_id);
@@ -62,8 +65,6 @@ create index if not exists idx_transactions_date    on public.transactions (tx_d
 
 -- ---------------------------------------------------------------------------
 --  FUNGSI BANTU (SECURITY DEFINER) — mencegah rekursi RLS.
---  Karena dimiliki oleh owner (postgres), fungsi ini membaca profiles dengan
---  melewati RLS, sehingga aman dipanggil dari dalam policy.
 -- ---------------------------------------------------------------------------
 create or replace function public.my_family_id()
 returns uuid
@@ -88,6 +89,23 @@ as $$
   );
 $$;
 
+-- Apakah transaksi masih boleh diedit/dihapus oleh pemiliknya?
+-- Terbuka bila: (a) tanggalnya masih bulan berjalan (WIB), ATAU
+--               (b) baru dibuat <= 7 hari (tenggang catat-terlupa), ATAU
+--               (c) admin telah membuka kunci (editable_until belum lewat).
+create or replace function public.tx_is_open(
+  p_tx_date date, p_created_at timestamptz, p_editable_until timestamptz
+)
+returns boolean
+language sql
+stable
+as $$
+  select
+    to_char(p_tx_date, 'YYYYMM') >= to_char((now() at time zone 'Asia/Jakarta'), 'YYYYMM')
+    or p_created_at >= now() - interval '7 days'
+    or (p_editable_until is not null and now() < p_editable_until);
+$$;
+
 -- ---------------------------------------------------------------------------
 --  AKTIFKAN ROW LEVEL SECURITY
 -- ---------------------------------------------------------------------------
@@ -98,7 +116,6 @@ alter table public.transactions enable row level security;
 
 -- ---------------------------------------------------------------------------
 --  POLICY: families
---  Hanya bisa melihat keluarga sendiri. Pembuatan keluarga lewat RPC.
 -- ---------------------------------------------------------------------------
 drop policy if exists families_select on public.families;
 create policy families_select on public.families
@@ -107,10 +124,6 @@ create policy families_select on public.families
 
 -- ---------------------------------------------------------------------------
 --  POLICY: profiles
---  - Setiap orang melihat profilnya sendiri.
---  - Admin melihat semua profil sefamili (untuk rincian per-anggota).
---  - Hanya boleh mengubah display_name milik sendiri (kolom sensitif dijaga
---    oleh trigger di bawah). Tidak ada INSERT/DELETE langsung (lewat RPC).
 -- ---------------------------------------------------------------------------
 drop policy if exists profiles_select_self  on public.profiles;
 drop policy if exists profiles_select_admin on public.profiles;
@@ -155,7 +168,6 @@ create trigger trg_protect_profile_columns
 
 -- ---------------------------------------------------------------------------
 --  POLICY: categories
---  Anggota keluarga boleh melihat & mengelola kategori keluarganya.
 -- ---------------------------------------------------------------------------
 drop policy if exists categories_select on public.categories;
 drop policy if exists categories_insert on public.categories;
@@ -180,17 +192,18 @@ create policy categories_delete on public.categories
   using (family_id = public.my_family_id());
 
 -- ---------------------------------------------------------------------------
---  POLICY: transactions  (INTI PRIVASI)
---  - SELECT  : milik sendiri ATAU (admin & sefamili) -> admin lihat semua.
---  - INSERT  : hanya milik sendiri & di keluarga sendiri.
---  - UPDATE  : hanya milik sendiri (admin pun tidak bisa edit punya anggota).
---  - DELETE  : hanya milik sendiri.
+--  POLICY: transactions  (INTI PRIVASI + PENGUNCIAN)
+--  - SELECT  : milik sendiri ATAU (admin & sefamili).
+--  - INSERT  : hanya milik sendiri & di keluarga sendiri (tanggal bebas).
+--  - UPDATE  : hanya milik sendiri DAN masih "terbuka" (belum terkunci).
+--  - DELETE  : milik sendiri DAN terbuka, ATAU oleh admin (sefamili).
 -- ---------------------------------------------------------------------------
 drop policy if exists tx_select_self  on public.transactions;
 drop policy if exists tx_select_admin on public.transactions;
 drop policy if exists tx_insert_self  on public.transactions;
 drop policy if exists tx_update_self  on public.transactions;
 drop policy if exists tx_delete_self  on public.transactions;
+drop policy if exists tx_delete_admin on public.transactions;
 
 create policy tx_select_self on public.transactions
   for select to authenticated
@@ -206,12 +219,17 @@ create policy tx_insert_self on public.transactions
 
 create policy tx_update_self on public.transactions
   for update to authenticated
-  using (user_id = auth.uid())
+  using (user_id = auth.uid() and public.tx_is_open(tx_date, created_at, editable_until))
   with check (user_id = auth.uid() and family_id = public.my_family_id());
 
 create policy tx_delete_self on public.transactions
   for delete to authenticated
-  using (user_id = auth.uid());
+  using (user_id = auth.uid() and public.tx_is_open(tx_date, created_at, editable_until));
+
+-- Admin boleh menghapus transaksi sefamili (mis. transaksi final yang salah).
+create policy tx_delete_admin on public.transactions
+  for delete to authenticated
+  using (public.is_family_admin() and family_id = public.my_family_id());
 
 -- ---------------------------------------------------------------------------
 --  KATEGORI DEFAULT — diisi otomatis saat keluarga dibuat.
@@ -347,12 +365,41 @@ end;
 $$;
 
 -- ---------------------------------------------------------------------------
+--  RPC: admin_unlock_transaction — admin membuka kunci transaksi final.
+--  Memberi pemilik jendela edit (default 7 hari). TIDAK mengubah nilai transaksi.
+-- ---------------------------------------------------------------------------
+create or replace function public.admin_unlock_transaction(p_tx_id uuid, p_days int default 7)
+returns timestamptz
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_until timestamptz;
+begin
+  if not public.is_family_admin() then
+    raise exception 'Hanya admin yang dapat membuka kunci';
+  end if;
+  update public.transactions
+     set editable_until = now() + (greatest(coalesce(p_days, 7), 1) || ' days')::interval
+   where id = p_tx_id and family_id = public.my_family_id()
+  returning editable_until into v_until;
+  if v_until is null then
+    raise exception 'Transaksi tidak ditemukan di keluarga Anda';
+  end if;
+  return v_until;
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
 --  HAK AKSES FUNGSI (anon tidak diberi; hanya pengguna login).
 -- ---------------------------------------------------------------------------
-grant execute on function public.my_family_id()                 to authenticated;
-grant execute on function public.is_family_admin()              to authenticated;
-grant execute on function public.create_family(text, text)      to authenticated;
-grant execute on function public.join_family(text, text)        to authenticated;
+grant execute on function public.my_family_id()                            to authenticated;
+grant execute on function public.is_family_admin()                         to authenticated;
+grant execute on function public.tx_is_open(date, timestamptz, timestamptz) to authenticated;
+grant execute on function public.create_family(text, text)                 to authenticated;
+grant execute on function public.join_family(text, text)                   to authenticated;
+grant execute on function public.admin_unlock_transaction(uuid, int)       to authenticated;
 
 -- ============================================================================
 --  SELESAI. Jangan lupa: di Authentication -> Sign In / Providers -> Email,

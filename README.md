@@ -156,6 +156,26 @@ akses yang tidak berhak — sesuai permintaan.
 
 ---
 
+## 🔒 Aturan penguncian transaksi (final)
+Untuk menjaga integritas data, transaksi **terkunci otomatis** setelah tenggat.
+Sebuah transaksi bisa diedit/dihapus oleh **pemiliknya** bila **salah satu** terpenuhi:
+- **(a)** tanggalnya masih di **bulan berjalan** (acuan zona **WIB / Asia-Jakarta**),
+- **(b)** **baru ditambahkan ≤ 7 hari** (berguna untuk mencatat yang terlupa, termasuk bertanggal bulan lalu),
+- **(c)** **admin sudah membuka kunci**.
+
+Setelah itu transaksi menjadi **Final 🔒**. **Admin/Kepala Keluarga** dapat:
+- **Membuka kunci** → memberi pemilik **7 hari** untuk memperbaiki (admin **tidak** mengubah nilainya), atau
+- **Menghapus** transaksi sefamili.
+
+Menambahkan transaksi baru (termasuk bertanggal bulan lalu) **selalu** bisa.
+Aturan ini ditegakkan di **RLS** (lihat `tx_is_open` di `supabase/schema.sql`).
+
+> **Untuk project yang sudah ada:** jalankan **`supabase/migration_lock.sql`** di
+> SQL Editor (sekali) untuk mengaktifkan fitur ini. Project baru sudah otomatis
+> lewat `schema.sql`.
+
+---
+
 ## 🆘 Pemecahan masalah
 | Gejala | Penyebab & solusi |
 |---|---|

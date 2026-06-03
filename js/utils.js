@@ -209,11 +209,26 @@ KK.util = (function () {
     });
   }
 
+  // Apakah transaksi masih boleh diedit/dihapus pemiliknya? (cermin aturan RLS;
+  // database tetap penentu akhir). Terbuka bila: bulan berjalan/depan, ATAU
+  // dibuat <=7 hari lalu, ATAU sudah dibuka admin (editable_until belum lewat).
+  function isTxOpen(t) {
+    if (!t) return false;
+    const now = new Date();
+    const d = new Date((t.tx_date || "") + "T00:00:00");
+    const txYM = d.getFullYear() * 100 + (d.getMonth() + 1);
+    const nowYM = now.getFullYear() * 100 + (now.getMonth() + 1);
+    if (txYM >= nowYM) return true;
+    if (t.created_at && (now - new Date(t.created_at)) <= 7 * 864e5) return true;
+    if (t.editable_until && new Date(t.editable_until) > now) return true;
+    return false;
+  }
+
   return {
     formatRupiah, formatNumber, parseNumber,
     todayISO, currentMonth, formatTanggal, formatTanggalPanjang, formatBulan,
     monthRange, prevMonth, ymd,
     $, $$, el, escapeHtml, clear, attachThousandsInput, setLoading,
-    toast, openModal, confirmDialog, downloadCSV,
+    toast, openModal, confirmDialog, downloadCSV, isTxOpen,
   };
 })();

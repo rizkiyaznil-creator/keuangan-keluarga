@@ -212,7 +212,8 @@ KK.app = (function () {
         memberMap: state.memberMap,
         month: state.month,
         showWho: isAdmin() && state.scope === "family" && !state.memberFilter,
-        onEditTx: (t) => { if (t.user_id === state.user.id) openTxModal(t); else viewOnlyTx(t); },
+        onEditTx: (t) => handleTxTap(t),
+        isLocked: (t) => !u.isTxOpen(t),
         onExportAll: async () => {
           try {
             const uid = scopeUserId();
@@ -393,22 +394,54 @@ KK.app = (function () {
     setTimeout(() => amount.focus(), 50);
   }
 
-  // Tampilan baca-saja untuk transaksi anggota lain (admin).
-  function viewOnlyTx(t) {
+  // Ketuk baris transaksi: edit bila milik sendiri & masih terbuka; selain itu detail.
+  function handleTxTap(t) {
+    if (t.user_id === state.user.id && u.isTxOpen(t)) openTxModal(t);
+    else openTxDetail(t);
+  }
+
+  // Tampilan baca-saja + aksi sesuai peran & status kunci.
+  function openTxDetail(t) {
+    const own = t.user_id === state.user.id;
+    const open = u.isTxOpen(t);
     const who = state.memberMap[t.user_id] || "Anggota";
-    u.openModal({
-      title: "Detail Transaksi",
-      body: u.el("div", { class: "form" }, [
-        detailRow("Anggota", who),
-        detailRow("Jenis", t.type === "income" ? "Pemasukan" : "Pengeluaran"),
-        detailRow("Jumlah", u.formatRupiah(t.amount)),
-        detailRow("Kategori", t.category_name || "Tanpa kategori"),
-        detailRow("Tanggal", u.formatTanggal(t.tx_date)),
-        detailRow("Catatan", t.note || "—"),
-        u.el("p", { class: "muted small", text: "Sebagai admin Anda dapat melihat transaksi anggota, tetapi tidak dapat mengubahnya." }),
-      ]),
-      actions: [{ label: "Tutup", class: "btn-primary", onClick: (c) => c() }],
-    });
+    const body = u.el("div", { class: "form" }, [
+      detailRow("Anggota", who),
+      detailRow("Jenis", t.type === "income" ? "Pemasukan" : "Pengeluaran"),
+      detailRow("Jumlah", u.formatRupiah(t.amount)),
+      detailRow("Kategori", t.category_name || "Tanpa kategori"),
+      detailRow("Tanggal", u.formatTanggal(t.tx_date)),
+      detailRow("Catatan", t.note || "—"),
+      detailRow("Status", open ? "Terbuka — bisa diedit" : "🔒 Final (terkunci)"),
+    ]);
+    let note = null;
+    if (!open && own && !isAdmin()) note = "Transaksi sudah final (lewat tenggat). Minta admin membuka kunci untuk memperbaiki.";
+    else if (!open && isAdmin()) note = "Transaksi final. Anda bisa membuka kunci (agar pemilik memperbaiki) atau menghapusnya.";
+    else if (open && !own) note = "Anda dapat melihat transaksi anggota, tetapi tidak dapat mengubah nilainya.";
+    if (note) body.appendChild(u.el("p", { class: "muted small", text: note }));
+
+    const actions = [{ label: "Tutup", class: "btn-ghost", onClick: (c) => c() }];
+    if (isAdmin()) {
+      if (!open) actions.push({ label: "🔓 Buka kunci", class: "btn-primary", onClick: async (close) => {
+        try {
+          await KK.db.adminUnlock(t.id, 7);
+          close();
+          u.toast("Kunci dibuka 7 hari — pemilik dapat memperbaiki.", "success");
+          renderActiveView();
+        } catch (err) { u.toast(KK.auth.friendly(err), "error"); }
+      } });
+      actions.push({ label: "🗑️ Hapus", class: "btn-danger", onClick: async (close) => {
+        const ok = await u.confirmDialog("Hapus transaksi ini?" + (own ? "" : " (milik " + who + ")"), { okText: "Hapus", danger: true });
+        if (!ok) return;
+        try {
+          await KK.db.deleteTransaction(t.id);
+          close();
+          u.toast("Transaksi dihapus.", "success");
+          renderActiveView();
+        } catch (err) { u.toast(KK.auth.friendly(err), "error"); }
+      } });
+    }
+    u.openModal({ title: "Detail Transaksi", body, actions });
   }
 
   // ------------------------------------------------------------------- KELUARGA

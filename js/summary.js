@@ -122,7 +122,7 @@ KK.summary = (function () {
     txs.forEach((t) => {
       const isIncome = t.type === "income";
       const tr = u.el("tr", { class: "tx-trow" }, [
-        u.el("td", { class: "td-date", text: u.formatTanggal(t.tx_date) }),
+        u.el("td", { class: "td-date" }, [u.formatTanggal(t.tx_date), (data.isLocked && data.isLocked(t)) ? u.el("span", { class: "lock-badge", title: "Final", text: " 🔒" }) : null]),
         u.el("td", {}, [
           u.el("div", { class: "td-cat", text: t.category_name || (isIncome ? "Pemasukan" : "Tanpa kategori") }),
           t.note ? u.el("div", { class: "td-note", text: t.note }) : null,
@@ -167,7 +167,7 @@ KK.summary = (function () {
       const tbody = u.el("tbody");
       g.items.forEach((t) => {
         const tr = u.el("tr", { class: "tx-trow" }, [
-          u.el("td", { class: "td-date", text: u.formatTanggal(t.tx_date) }),
+          u.el("td", { class: "td-date" }, [u.formatTanggal(t.tx_date), (data.isLocked && data.isLocked(t)) ? u.el("span", { class: "lock-badge", title: "Final", text: " 🔒" }) : null]),
           u.el("td", { class: "td-cat", text: t.note || "—" }),
           showWho ? u.el("td", { class: "td-who", text: memberMap[t.user_id] || "—" }) : null,
           u.el("td", { class: "td-amt ta-right " + (isIncome ? "pos" : "neg"), text: (isIncome ? "+ " : "− ") + u.formatRupiah(t.amount) }),
