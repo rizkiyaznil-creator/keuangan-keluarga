@@ -210,6 +210,31 @@ code { background: #e2e8f0; padding: .1rem .35rem; border-radius: 6px; font-size
 .tx-trow.clickable { cursor: pointer; }
 .tx-trow.clickable:hover td { background: #f8fafc; }
 
+/* Kontrol grafik & tabel (toggle) */
+.chart-controls { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: .9rem; }
+
+/* Diagram pai (donut) */
+.pie-wrap { display: flex; flex-direction: column; gap: 1rem; align-items: center; }
+.pie-chart { display: flex; justify-content: center; width: 100%; }
+.pie-svg { width: min(58vw, 200px); height: auto; }
+.pie-svg circle { transition: stroke-dasharray .4s ease, stroke-dashoffset .4s ease; }
+.pie-legend { width: 100%; display: flex; flex-direction: column; gap: .5rem; }
+.legend-row { display: flex; align-items: center; gap: .5rem; font-size: .86rem; }
+.legend-name { font-weight: 600; }
+.legend-val { margin-left: auto; color: var(--muted); white-space: nowrap; }
+@media (min-width: 560px) {
+  .pie-wrap { flex-direction: row; align-items: center; }
+  .pie-chart { width: auto; }
+  .pie-legend { flex: 1; }
+}
+
+/* Tabel transaksi dikelompokkan per kategori */
+.cat-groups { display: flex; flex-direction: column; gap: 1.2rem; }
+.cat-group-head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; padding-bottom: .3rem; border-bottom: 2px solid var(--border); margin-bottom: .15rem; }
+.cat-group-name { font-weight: 700; }
+.cat-group-count { color: var(--muted); font-weight: 600; font-size: .85rem; }
+.cat-group-total { font-weight: 800; white-space: nowrap; }
+
 /* Kategori */
 .cat-row { display: flex; align-items: center; justify-content: space-between; gap: .5rem; padding: .55rem 0; border-bottom: 1px solid var(--border); }
 .cat-row:last-child { border-bottom: none; }

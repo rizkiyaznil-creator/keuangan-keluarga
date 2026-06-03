@@ -1,38 +1,48 @@
-// Modul ringkasan: hitung total & rincian per kategori, render kartu ringkasan,
-// grafik batang per kategori (CSS murni), dan daftar transaksi terbaru.
+// Modul ringkasan: hitung total & rincian per kategori; render kartu ringkasan,
+// grafik per kategori (batang ATAU pai, untuk pemasukan ATAU pengeluaran),
+// dan daftar transaksi (per kategori ATAU per tanggal) + ekspor CSV.
 window.KK = window.KK || {};
 
 KK.summary = (function () {
   const u = KK.util;
 
-  // Palet warna untuk batang grafik kategori.
   const COLORS = [
     "#0d9488", "#f59e0b", "#3b82f6", "#ef4444", "#8b5cf6",
     "#10b981", "#ec4899", "#f97316", "#14b8a6", "#6366f1",
-    "#84cc16", "#06b6d4",
+    "#84cc16", "#06b6d4", "#e11d48", "#a855f7", "#0ea5e9",
   ];
+  const colorAt = (i) => COLORS[i % COLORS.length];
+
+  function buildCats(map, total) {
+    const arr = Array.from(map, ([name, sum]) => ({ name, total: sum }));
+    arr.sort((a, b) => b.total - a.total);
+    const max = arr.length ? arr[0].total : 0;
+    arr.forEach((c) => {
+      c.pctOfTotal = total > 0 ? (c.total / total) * 100 : 0;
+      c.pctOfMax = max > 0 ? (c.total / max) * 100 : 0;
+    });
+    return arr;
+  }
 
   function compute(transactions) {
     let income = 0, expense = 0;
-    const catMap = new Map();
+    const inc = new Map(), exp = new Map();
     transactions.forEach((t) => {
-      if (t.type === "income") income += t.amount;
-      else {
-        expense += t.amount;
-        const key = t.category_name || "Tanpa kategori";
-        catMap.set(key, (catMap.get(key) || 0) + t.amount);
-      }
+      const amt = Number(t.amount) || 0;
+      const key = t.category_name || "Tanpa kategori";
+      if (t.type === "income") { income += amt; inc.set(key, (inc.get(key) || 0) + amt); }
+      else { expense += amt; exp.set(key, (exp.get(key) || 0) + amt); }
     });
-    const byCategory = Array.from(catMap, ([name, total]) => ({ name, total }))
-      .sort((a, b) => b.total - a.total);
-    const maxCat = byCategory.length ? byCategory[0].total : 0;
-    byCategory.forEach((c) => {
-      c.pctOfExpense = expense > 0 ? (c.total / expense) * 100 : 0;
-      c.pctOfMax = maxCat > 0 ? (c.total / maxCat) * 100 : 0;
-    });
-    return { income, expense, balance: income - expense, byCategory };
+    const expenseByCategory = buildCats(exp, expense);
+    const incomeByCategory = buildCats(inc, income);
+    return {
+      income, expense, balance: income - expense,
+      expenseByCategory, incomeByCategory,
+      byCategory: expenseByCategory, // kompatibilitas lama
+    };
   }
 
+  // ---------- elemen kecil ----------
   function statCard(label, value, cls) {
     return u.el("div", { class: "stat-card " + (cls || "") }, [
       u.el("div", { class: "stat-label", text: label }),
@@ -40,20 +50,25 @@ KK.summary = (function () {
     ]);
   }
 
-  function renderChart(byCategory) {
-    if (!byCategory.length) {
-      return u.el("p", { class: "muted", text: "Belum ada pengeluaran pada periode ini." });
-    }
+  function segmented(opts, current, onChange) {
+    const wrap = u.el("div", { class: "segmented" });
+    opts.forEach((o) => {
+      const b = u.el("button", { type: "button", class: "seg" + (o.value === current ? " active" : ""), text: o.label });
+      b.addEventListener("click", () => { if (o.value !== current) onChange(o.value); });
+      wrap.appendChild(b);
+    });
+    return wrap;
+  }
+
+  // ---------- grafik ----------
+  function renderBars(items) {
     const wrap = u.el("div", { class: "chart" });
-    byCategory.forEach((c, i) => {
-      const color = COLORS[i % COLORS.length];
+    items.forEach((c, i) => {
+      const color = colorAt(i);
       wrap.appendChild(u.el("div", { class: "chart-row" }, [
         u.el("div", { class: "chart-head" }, [
-          u.el("span", { class: "chart-name" }, [
-            u.el("span", { class: "dot", style: "background:" + color }),
-            c.name,
-          ]),
-          u.el("span", { class: "chart-val", text: u.formatRupiah(c.total) + " · " + Math.round(c.pctOfExpense) + "%" }),
+          u.el("span", { class: "chart-name" }, [u.el("span", { class: "dot", style: "background:" + color }), c.name]),
+          u.el("span", { class: "chart-val", text: u.formatRupiah(c.total) + " · " + Math.round(c.pctOfTotal) + "%" }),
         ]),
         u.el("div", { class: "bar-track" }, [
           u.el("div", { class: "bar-fill", style: "width:" + Math.max(2, c.pctOfMax) + "%;background:" + color }),
@@ -63,87 +78,46 @@ KK.summary = (function () {
     return wrap;
   }
 
-  function txRow(t, opts) {
-    opts = opts || {};
-    const isIncome = t.type === "income";
-    const left = u.el("div", { class: "tx-left" }, [
-      u.el("div", { class: "tx-cat", text: t.category_name || (isIncome ? "Pemasukan" : "Tanpa kategori") }),
-      u.el("div", { class: "tx-sub" }, [
-        u.formatTanggal(t.tx_date),
-        opts.who ? u.el("span", { class: "tx-who", text: " · " + opts.who }) : null,
-        t.note ? u.el("span", { class: "tx-note", text: " · " + t.note }) : null,
-      ]),
-    ]);
-    const right = u.el("div", { class: "tx-amt " + (isIncome ? "pos" : "neg"), text: (isIncome ? "+ " : "− ") + u.formatRupiah(t.amount) });
-    const row = u.el("div", { class: "tx-row" }, [left, right]);
-    if (opts.onClick) { row.classList.add("clickable"); row.addEventListener("click", () => opts.onClick(t)); }
-    return row;
+  function renderPie(items) {
+    let cumulative = 0, segs = "";
+    items.forEach((it, i) => {
+      const val = it.pctOfTotal;
+      if (val <= 0) return;
+      segs += '<circle cx="21" cy="21" r="15.91549431" fill="transparent" stroke="' + colorAt(i) +
+        '" stroke-width="6" stroke-dasharray="' + val.toFixed(3) + " " + (100 - val).toFixed(3) +
+        '" stroke-dashoffset="' + (25 - cumulative).toFixed(3) + '"></circle>';
+      cumulative += val;
+    });
+    const svg = '<svg viewBox="0 0 42 42" class="pie-svg" role="img" aria-label="Diagram lingkaran per kategori">' +
+      '<circle cx="21" cy="21" r="15.91549431" fill="transparent" stroke="#eef2f7" stroke-width="6"></circle>' +
+      segs + "</svg>";
+
+    const legend = u.el("div", { class: "pie-legend" });
+    items.forEach((it, i) => {
+      legend.appendChild(u.el("div", { class: "legend-row" }, [
+        u.el("span", { class: "dot", style: "background:" + colorAt(i) }),
+        u.el("span", { class: "legend-name", text: it.name }),
+        u.el("span", { class: "legend-val", text: u.formatRupiah(it.total) + " · " + Math.round(it.pctOfTotal) + "%" }),
+      ]));
+    });
+    return u.el("div", { class: "pie-wrap" }, [u.el("div", { class: "pie-chart", html: svg }), legend]);
   }
 
-  // container: elemen tujuan; data: { transactions, memberMap, showWho, onEditTx }
-  function render(container, data) {
-    const u2 = u;
-    u2.clear(container);
-    const txs = data.transactions || [];
-    const r = compute(txs);
-
-    const stats = u2.el("div", { class: "stats-grid" }, [
-      statCard("Pemasukan", r.income, "income"),
-      statCard("Pengeluaran", r.expense, "expense"),
-      statCard("Saldo", r.balance, r.balance >= 0 ? "balance-pos" : "balance-neg"),
-    ]);
-    container.appendChild(stats);
-
-    container.appendChild(u2.el("section", { class: "card" }, [
-      u2.el("h3", { class: "card-title", text: "Pengeluaran per Kategori" }),
-      renderChart(r.byCategory),
-    ]));
-
-    // Tabel semua transaksi + tombol ekspor
-    const section = u2.el("section", { class: "card" });
-    section.appendChild(u2.el("div", { class: "card-head" }, [
-      u2.el("h3", { class: "card-title", text: "Semua Transaksi" }),
-      u2.el("span", { class: "count-badge", text: txs.length + " transaksi" }),
-    ]));
-
-    const exportRow = u2.el("div", { class: "export-row" });
-    if (txs.length) {
-      exportRow.appendChild(u2.el("button", {
-        class: "btn btn-ghost btn-sm",
-        text: "⬇️ Ekspor bulan ini",
-        onClick: () => exportTransactions(txs, data.memberMap, "keuangan_" + (data.month || "data") + ".csv"),
-      }));
-    }
-    if (data.onExportAll) {
-      exportRow.appendChild(u2.el("button", {
-        class: "btn btn-ghost btn-sm",
-        text: "⬇️ Ekspor semua bulan",
-        onClick: () => data.onExportAll(),
-      }));
-    }
-    if (exportRow.childNodes.length) section.appendChild(exportRow);
-
-    if (!txs.length) {
-      section.appendChild(u2.el("p", { class: "muted", text: "Belum ada transaksi pada periode ini." }));
-    } else {
-      section.appendChild(renderTable(txs, data));
-    }
-    container.appendChild(section);
-
-    return r;
+  function renderCategoryChart(container, items, style) {
+    u.clear(container);
+    if (!items.length) { container.appendChild(u.el("p", { class: "muted", text: "Belum ada data pada periode ini." })); return; }
+    container.appendChild(style === "pie" ? renderPie(items) : renderBars(items));
   }
 
-  function renderTable(txs, data) {
+  // ---------- tabel transaksi ----------
+  function flatTable(txs, data) {
     const showWho = !!data.showWho;
     const memberMap = data.memberMap || {};
-    const thead = u.el("thead", {}, [
-      u.el("tr", {}, [
-        u.el("th", { text: "Tgl" }),
-        u.el("th", { text: "Uraian" }),
-        showWho ? u.el("th", { text: "Anggota" }) : null,
-        u.el("th", { class: "ta-right", text: "Jumlah" }),
-      ]),
-    ]);
+    const thead = u.el("thead", {}, [u.el("tr", {}, [
+      u.el("th", { text: "Tgl" }), u.el("th", { text: "Uraian" }),
+      showWho ? u.el("th", { text: "Anggota" }) : null,
+      u.el("th", { class: "ta-right", text: "Jumlah" }),
+    ])]);
     const tbody = u.el("tbody");
     txs.forEach((t) => {
       const isIncome = t.type === "income";
@@ -154,16 +128,56 @@ KK.summary = (function () {
           t.note ? u.el("div", { class: "td-note", text: t.note }) : null,
         ]),
         showWho ? u.el("td", { class: "td-who", text: memberMap[t.user_id] || "—" }) : null,
-        u.el("td", { class: "td-amt ta-right " + (isIncome ? "pos" : "neg"),
-          text: (isIncome ? "+ " : "− ") + u.formatRupiah(t.amount) }),
+        u.el("td", { class: "td-amt ta-right " + (isIncome ? "pos" : "neg"), text: (isIncome ? "+ " : "− ") + u.formatRupiah(t.amount) }),
       ]);
-      if (data.onEditTx) {
-        tr.classList.add("clickable");
-        tr.addEventListener("click", () => data.onEditTx(t));
-      }
+      if (data.onEditTx) { tr.classList.add("clickable"); tr.addEventListener("click", () => data.onEditTx(t)); }
       tbody.appendChild(tr);
     });
     return u.el("div", { class: "table-wrap" }, [u.el("table", { class: "tx-table" }, [thead, tbody])]);
+  }
+
+  function groupByCategory(txs) {
+    const map = new Map();
+    txs.forEach((t) => {
+      const name = t.category_name || "Tanpa kategori";
+      const key = name + "|" + t.type; // pisahkan kategori bernama sama beda jenis
+      let g = map.get(key);
+      if (!g) { g = { name, type: t.type, total: 0, items: [] }; map.set(key, g); }
+      g.total += Number(t.amount) || 0;
+      g.items.push(t);
+    });
+    return Array.from(map.values()).sort((a, b) => b.total - a.total);
+  }
+
+  function categoryTables(txs, data) {
+    const showWho = !!data.showWho;
+    const memberMap = data.memberMap || {};
+    const container = u.el("div", { class: "cat-groups" });
+    groupByCategory(txs).forEach((g) => {
+      const isIncome = g.type === "income";
+      const head = u.el("div", { class: "cat-group-head" }, [
+        u.el("span", { class: "cat-group-name" }, [g.name, u.el("span", { class: "cat-group-count", text: " (" + g.items.length + ")" })]),
+        u.el("span", { class: "cat-group-total " + (isIncome ? "pos" : "neg"), text: (isIncome ? "+ " : "− ") + u.formatRupiah(g.total) }),
+      ]);
+      const thead = u.el("thead", {}, [u.el("tr", {}, [
+        u.el("th", { text: "Tgl" }), u.el("th", { text: "Catatan" }),
+        showWho ? u.el("th", { text: "Anggota" }) : null,
+        u.el("th", { class: "ta-right", text: "Jumlah" }),
+      ])]);
+      const tbody = u.el("tbody");
+      g.items.forEach((t) => {
+        const tr = u.el("tr", { class: "tx-trow" }, [
+          u.el("td", { class: "td-date", text: u.formatTanggal(t.tx_date) }),
+          u.el("td", { class: "td-cat", text: t.note || "—" }),
+          showWho ? u.el("td", { class: "td-who", text: memberMap[t.user_id] || "—" }) : null,
+          u.el("td", { class: "td-amt ta-right " + (isIncome ? "pos" : "neg"), text: (isIncome ? "+ " : "− ") + u.formatRupiah(t.amount) }),
+        ]);
+        if (data.onEditTx) { tr.classList.add("clickable"); tr.addEventListener("click", () => data.onEditTx(t)); }
+        tbody.appendChild(tr);
+      });
+      container.appendChild(u.el("div", { class: "cat-group" }, [head, u.el("div", { class: "table-wrap" }, [u.el("table", { class: "tx-table" }, [thead, tbody])])]));
+    });
+    return container;
   }
 
   function exportTransactions(txs, memberMap, filename) {
@@ -181,5 +195,80 @@ KK.summary = (function () {
     u.toast(rows.length + " transaksi diekspor ke CSV.", "success");
   }
 
-  return { compute, render, txRow, renderTable, exportTransactions };
+  // ---------- render utama ----------
+  function render(container, data) {
+    u.clear(container);
+    const txs = data.transactions || [];
+    const r = compute(txs);
+
+    // Statistik
+    container.appendChild(u.el("div", { class: "stats-grid" }, [
+      statCard("Pemasukan", r.income, "income"),
+      statCard("Pengeluaran", r.expense, "expense"),
+      statCard("Saldo", r.balance, r.balance >= 0 ? "balance-pos" : "balance-neg"),
+    ]));
+
+    // Kartu grafik (default: Pengeluaran + Pai)
+    let chartType = "expense", chartStyle = "pie";
+    const chartCard = u.el("section", { class: "card" });
+    container.appendChild(chartCard);
+    function renderChartCard() {
+      u.clear(chartCard);
+      const items = chartType === "expense" ? r.expenseByCategory : r.incomeByCategory;
+      const total = chartType === "expense" ? r.expense : r.income;
+      chartCard.appendChild(u.el("div", { class: "card-head" }, [
+        u.el("h3", { class: "card-title", text: (chartType === "expense" ? "Pengeluaran" : "Pemasukan") + " per Kategori" }),
+        u.el("span", { class: "count-badge", text: u.formatRupiah(total) }),
+      ]));
+      chartCard.appendChild(u.el("div", { class: "chart-controls" }, [
+        segmented([{ value: "expense", label: "Pengeluaran" }, { value: "income", label: "Pemasukan" }], chartType, (v) => { chartType = v; renderChartCard(); }),
+        segmented([{ value: "bar", label: "Batang" }, { value: "pie", label: "Pai" }], chartStyle, (v) => { chartStyle = v; renderChartCard(); }),
+      ]));
+      const body = u.el("div", {});
+      chartCard.appendChild(body);
+      renderCategoryChart(body, items, chartStyle);
+    }
+    renderChartCard();
+
+    // Kartu transaksi (default: Per Kategori)
+    let groupBy = "category";
+    const txCard = u.el("section", { class: "card" });
+    container.appendChild(txCard);
+    function renderTxCard() {
+      u.clear(txCard);
+      txCard.appendChild(u.el("div", { class: "card-head" }, [
+        u.el("h3", { class: "card-title", text: "Semua Transaksi" }),
+        u.el("span", { class: "count-badge", text: txs.length + " transaksi" }),
+      ]));
+
+      const exportRow = u.el("div", { class: "export-row" });
+      if (txs.length) {
+        exportRow.appendChild(u.el("button", { class: "btn btn-ghost btn-sm", text: "⬇️ Ekspor bulan ini",
+          onClick: () => exportTransactions(txs, data.memberMap, "keuangan_" + (data.month || "data") + ".csv") }));
+      }
+      if (data.onExportAll) {
+        exportRow.appendChild(u.el("button", { class: "btn btn-ghost btn-sm", text: "⬇️ Ekspor semua bulan",
+          onClick: () => data.onExportAll() }));
+      }
+      if (exportRow.childNodes.length) txCard.appendChild(exportRow);
+
+      txCard.appendChild(u.el("div", { class: "chart-controls" }, [
+        segmented([{ value: "category", label: "Per Kategori" }, { value: "date", label: "Per Tanggal" }], groupBy, (v) => { groupBy = v; renderTxCard(); }),
+      ]));
+
+      const body = u.el("div", {});
+      txCard.appendChild(body);
+      if (!txs.length) body.appendChild(u.el("p", { class: "muted", text: "Belum ada transaksi pada periode ini." }));
+      else body.appendChild(groupBy === "category" ? categoryTables(txs, data) : flatTable(txs, data));
+    }
+    renderTxCard();
+
+    return r;
+  }
+
+  return {
+    compute, render, exportTransactions,
+    renderBars, renderPie, flatTable, categoryTables, groupByCategory,
+    renderTable: flatTable, // alias kompatibilitas
+  };
 })();
