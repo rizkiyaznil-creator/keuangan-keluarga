@@ -193,14 +193,18 @@ KK.ai = (function () {
     const { data, error } = await KK.sb.functions.invoke("ai-parse", { body: payload });
     if (error) {
       let msg = (error && error.message) || "Gagal memanggil layanan AI.";
+      let gotBody = false;
       try {
         if (error.context && typeof error.context.json === "function") {
           const body = await error.context.json();
-          if (body && body.error) msg = body.error;
-          if (body && body.detail) msg += "\n\nDetail dari Google: " + String(body.detail);
+          if (body && body.error) { msg = body.error; gotBody = true; }
+          if (body && body.detail) msg += "\n\nDetail: " + String(body.detail);
         }
       } catch (_) { /* abaikan */ }
-      if (/Failed to fetch|NetworkError|load failed|not found|404/i.test(msg)) {
+      // "Fitur belum aktif" HANYA bila benar-benar gagal menghubungi function —
+      // jangan tertukar dengan error terstruktur dari penyedia (mis. 404 "model
+      // tidak ditemukan" dari Gemini yang kebetulan memuat "404/not found").
+      if (!gotBody && /Failed to fetch|NetworkError|load failed|not found|404/i.test(msg)) {
         msg = "Fitur AI belum aktif atau tidak ada koneksi. Pastikan Edge Function \"ai-parse\" sudah dipasang (lihat README).";
       }
       throw new Error(msg);
