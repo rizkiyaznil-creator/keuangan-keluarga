@@ -197,6 +197,7 @@ KK.ai = (function () {
         if (error.context && typeof error.context.json === "function") {
           const body = await error.context.json();
           if (body && body.error) msg = body.error;
+          if (body && body.detail) msg += "\n\nDetail dari Google: " + String(body.detail);
         }
       } catch (_) { /* abaikan */ }
       if (/Failed to fetch|NetworkError|load failed|not found|404/i.test(msg)) {
