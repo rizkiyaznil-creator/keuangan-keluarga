@@ -138,6 +138,7 @@ KK.app = (function () {
     else if (state.view === "advice") viewAdvice(main);
     else if (state.view === "categories") viewCategories(main);
     else if (state.view === "family") viewFamily(main);
+    else if (state.view === "about") viewAbout(main);
   }
 
   function loading(container, text) {
@@ -512,21 +513,31 @@ KK.app = (function () {
         ]));
       });
       main.appendChild(memSec);
-
-      // Bagikan & pasang aplikasi
-      const shareBtn = iconBtn("🔗 Bagikan Aplikasi", shareApp);
-      const installBtn = iconBtn("⬇️ Pasang Aplikasi", () => {
-        if (KK.install && KK.install.promptInstall) KK.install.promptInstall();
-      });
-      main.appendChild(u.el("section", { class: "card" }, [
-        u.el("h3", { class: "card-title", text: "Aplikasi" }),
-        u.el("p", { class: "muted", text: "Bagikan aplikasi ini ke keluarga, atau pasang ke layar utama perangkat Anda." }),
-        u.el("div", { class: "app-actions" }, [shareBtn, installBtn]),
-      ]));
-
-      // Kredit perancang (selalu di bagian paling bawah)
-      main.appendChild(u.el("p", { class: "app-credit", text: "Design by Muhammad Rizki Yaznil" }));
     } catch (err) { errorBox(main, err); }
+  }
+
+  // ------------------------------------------------------------------- TENTANG
+  function viewAbout(main) {
+    u.clear(main);
+    main.appendChild(pageTitle("Tentang", "Keuangan Keluarga"));
+
+    main.appendChild(u.el("section", { class: "card about-card" }, [
+      u.el("img", { class: "about-logo", src: "icons/icon-192.png", alt: "", width: 64, height: 64 }),
+      u.el("h3", { class: "about-name", text: "Keuangan Keluarga" }),
+      u.el("p", { class: "muted about-desc", text: "Catat pemasukan & pengeluaran keluarga, lihat ringkasan bulanan, dan dapatkan saran keuangan sehat — bersama satu keluarga." }),
+    ]));
+
+    const shareBtn = iconBtn("🔗 Bagikan Aplikasi", shareApp);
+    const installBtn = iconBtn("⬇️ Pasang Aplikasi", () => {
+      if (KK.install && KK.install.promptInstall) KK.install.promptInstall();
+    });
+    main.appendChild(u.el("section", { class: "card" }, [
+      u.el("h3", { class: "card-title", text: "Aplikasi" }),
+      u.el("p", { class: "muted", text: "Bagikan aplikasi ini ke keluarga, atau pasang ke layar utama perangkat Anda." }),
+      u.el("div", { class: "app-actions" }, [shareBtn, installBtn]),
+    ]));
+
+    main.appendChild(u.el("p", { class: "app-credit", text: "Design by Muhammad Rizki Yaznil" }));
   }
 
   // ----------------------------------------------------------------- AKUN MODAL

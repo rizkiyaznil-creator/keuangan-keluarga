@@ -129,7 +129,7 @@ code { background: #e2e8f0; padding: .1rem .35rem; border-radius: 6px; font-size
   background: #fff; border-top: 1px solid var(--border);
   padding: .35rem .25rem; padding-bottom: max(.35rem, env(safe-area-inset-bottom));
 }
-.nav-item { flex: 1; max-width: 120px; display: flex; flex-direction: column; align-items: center; gap: .15rem; background: none; border: none; cursor: pointer; color: var(--muted); font: inherit; padding: .35rem 0; border-radius: 10px; }
+.nav-item { flex: 1; min-width: 0; max-width: 120px; display: flex; flex-direction: column; align-items: center; gap: .15rem; background: none; border: none; cursor: pointer; color: var(--muted); font: inherit; padding: .35rem 0; border-radius: 10px; }
 .nav-item .nav-ic { font-size: 1.25rem; line-height: 1; }
 .nav-item .nav-tx { font-size: .68rem; font-weight: 600; }
 .nav-item.active { color: var(--teal-700); }
@@ -322,6 +322,10 @@ body.modal-open { overflow: hidden; }
 .install-help p { margin: 0 0 .5rem; }
 .install-steps { margin: 0; padding-left: 1.2rem; color: var(--text); display: grid; gap: .35rem; }
 .install-steps li { line-height: 1.4; }
+.about-card { text-align: center; }
+.about-logo { border-radius: 16px; margin: 0 auto .5rem; display: block; }
+.about-name { margin: 0 0 .25rem; }
+.about-desc { margin: 0 auto; max-width: 42ch; }
 
 /* ------------------------------ Input AI ------------------------------- */
 /* Lembar pilihan saat menekan "Tambah" */
