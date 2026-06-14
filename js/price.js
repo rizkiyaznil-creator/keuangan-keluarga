@@ -109,13 +109,14 @@ KK.price = (function () {
     u.openModal({ title: it.name, body });
   }
 
-  async function render(container) {
+  async function render(container, scope) {
+    scope = scope === "family" ? "family" : "self";
     u.clear(container);
     container.appendChild(u.el("div", { class: "loading", text: "Memuat data harga…" }));
 
     let rows;
     try {
-      rows = await KK.db.priceRows();
+      rows = await KK.db.priceRows(scope);
     } catch (err) {
       u.clear(container);
       container.appendChild(u.el("div", { class: "error-box" }, [
@@ -132,7 +133,9 @@ KK.price = (function () {
       container.appendChild(u.el("div", { class: "card" }, [
         u.el("h3", { class: "card-title", text: "Belum ada data harga" }),
         u.el("p", { class: "muted", text: "Gunakan ＋ Tambah → 📷 Scan struk untuk mulai mengumpulkan harga barang & toko." }),
-        u.el("p", { class: "hint", text: "Data dari seluruh anggota keluarga akan terkumpul di sini untuk dibandingkan." }),
+        u.el("p", { class: "hint", text: scope === "family"
+          ? "Data dari seluruh anggota keluarga akan terkumpul di sini untuk dibandingkan."
+          : "Data dari struk yang Anda pindai akan terkumpul di sini untuk dibandingkan." }),
       ]));
       return;
     }

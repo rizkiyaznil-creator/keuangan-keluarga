@@ -200,9 +200,10 @@ KK.db = (function () {
     return unwrap(await sb().rpc("admin_unlock_transaction", { p_tx_id: id, p_days: days || 7 }));
   }
 
-  // Fase 2: ringkasan harga se-keluarga (barang/toko/harga/tanggal) via RPC aman.
-  async function priceRows() {
-    return unwrap(await sb().rpc("price_rows")) || [];
+  // Fase 2: ringkasan harga (barang/toko/harga/tanggal) via RPC aman.
+  // scope: 'self' (default) = data sendiri; 'family' = se-keluarga (hanya admin).
+  async function priceRows(scope) {
+    return unwrap(await sb().rpc("price_rows", { p_scope: scope === "family" ? "family" : "self" })) || [];
   }
 
   return {

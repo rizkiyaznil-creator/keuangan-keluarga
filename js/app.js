@@ -245,6 +245,7 @@ KK.app = (function () {
     ]));
 
     if (tab === "saran") main.appendChild(controlsBar({ withMemberFilter: false }));
+    else if (isAdmin()) main.appendChild(scopeBar());   // Harga: admin pilih lingkup Saya/Keluarga
 
     const body = u.el("div");
     main.appendChild(body);
@@ -263,8 +264,22 @@ KK.app = (function () {
         KK.advice.render(card, thisTxs, lastTxs);
       } catch (err) { errorBox(body, err); }
     } else {
-      await KK.price.render(body);
+      await KK.price.render(body, isAdmin() ? state.scope : "self");
     }
+  }
+
+  // Toggle lingkup Saya/Keluarga (admin) untuk tab Harga — tanpa pemilih bulan.
+  function scopeBar() {
+    const seg = u.el("div", { class: "segmented" });
+    ["self", "family"].forEach((s) => {
+      const b = u.el("button", { class: "seg" + (state.scope === s ? " active" : ""), type: "button",
+        text: s === "self" ? "Saya" : "Keluarga" });
+      b.addEventListener("click", () => { state.scope = s; renderActiveView(); });
+      seg.appendChild(b);
+    });
+    return u.el("div", { class: "controls" }, [
+      u.el("div", { class: "control" }, [u.el("span", { class: "control-label", text: "Lingkup" }), seg]),
+    ]);
   }
 
   // ------------------------------------------------------------------- KATEGORI
