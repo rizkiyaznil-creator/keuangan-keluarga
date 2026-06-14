@@ -316,6 +316,55 @@ body.modal-open { overflow: hidden; }
 .install-action { flex-shrink: 0; white-space: nowrap; }
 .install-close { flex-shrink: 0; border: none; background: none; font-size: 1.5rem; line-height: 1; color: var(--muted); cursor: pointer; padding: 0 .15rem; }
 
+/* ------------------------------ Input AI ------------------------------- */
+/* Lembar pilihan saat menekan "Tambah" */
+.ai-opts { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; }
+.ai-opt { display: flex; align-items: center; gap: .6rem; text-align: left; padding: .75rem; border: 1px solid var(--border-2); border-radius: var(--radius-sm); background: #fff; cursor: pointer; font: inherit; }
+.ai-opt:hover { border-color: var(--teal-600); background: var(--teal-50); }
+.ai-opt-ic { font-size: 1.5rem; line-height: 1; }
+.ai-opt-txt { display: flex; flex-direction: column; min-width: 0; }
+.ai-opt-title { font-weight: 700; }
+.ai-opt-desc { font-size: .74rem; color: var(--muted); }
+@media (max-width: 360px) { .ai-opts { grid-template-columns: 1fr; } }
+
+.ai-textarea { resize: vertical; min-height: 4.6rem; line-height: 1.4; }
+
+/* Status memuat */
+.ai-loading { text-align: center; padding: 1.6rem .5rem; color: var(--muted); }
+.ai-spinner { width: 2.1rem; height: 2.1rem; border: 3px solid var(--border); border-top-color: var(--teal-600); border-radius: 50%; margin: 0 auto .7rem; animation: ai-spin .8s linear infinite; }
+@keyframes ai-spin { to { transform: rotate(360deg); } }
+
+/* Tinjau & edit */
+.ai-section-head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin: .9rem 0 .5rem; }
+.ai-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; }
+.ai-transcript { background: var(--teal-50); border: 1px solid #ccfbf1; border-radius: var(--radius-sm); padding: .55rem .7rem; font-size: .9rem; }
+.ai-transcript b { color: var(--teal-700); }
+
+.ai-items { display: flex; flex-direction: column; gap: .6rem; }
+.ai-item { position: relative; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: .6rem; padding-right: 1.8rem; }
+.ai-item-grid { display: flex; flex-direction: column; gap: .5rem; }
+.ai-item-sub { font-size: .75rem; color: var(--muted); }
+.ai-item-remove { position: absolute; top: .3rem; right: .35rem; border: none; background: none; color: var(--muted); font-size: 1.25rem; line-height: 1; cursor: pointer; padding: .1rem .3rem; }
+.ai-item-remove:hover { color: var(--red); }
+.ai-cat-slot { display: flex; }
+.ai-cat-slot > select { width: 100%; }
+
+.ai-add-row { width: 100%; margin-top: .6rem; }
+.ai-total { display: flex; align-items: center; justify-content: space-between; font-weight: 800; padding: .7rem .15rem .15rem; margin-top: .3rem; border-top: 2px solid var(--border); }
+.ai-total-val { color: var(--red); }
+
+.ai-foot { display: flex; gap: .5rem; margin-top: 1.1rem; }
+.ai-foot .btn { flex: 1; }
+
+/* Perekam suara */
+.ai-rec { display: flex; flex-direction: column; align-items: center; gap: .7rem; padding: 1.1rem 0 .4rem; }
+.ai-rec-btn { width: 5rem; height: 5rem; border-radius: 50%; border: none; background: var(--teal-700); color: #fff; font-size: 2rem; cursor: pointer; display: grid; place-items: center; box-shadow: var(--shadow-lg); transition: background .15s; }
+.ai-rec-btn:hover { background: var(--teal-600); }
+.ai-rec-btn.recording { background: var(--red); animation: ai-pulse 1.2s ease-in-out infinite; }
+@keyframes ai-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.07); } }
+.ai-rec-time { font-size: 1.4rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.ai-rec-hint { color: var(--muted); font-size: .85rem; text-align: center; max-width: 22rem; }
+
 /* ------------------------------ Desktop -------------------------------- */
 @media (min-width: 768px) {
   .stats-grid { grid-template-columns: 1fr 1fr 1fr; }

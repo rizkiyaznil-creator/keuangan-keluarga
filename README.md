@@ -18,6 +18,14 @@ layar utama HP ("Add to Home Screen") karena sudah berupa PWA.
 - **Ringkasan bulanan**: total pemasukan, pengeluaran, saldo, grafik pengeluaran
   per kategori, dan **tabel semua transaksi** yang bisa **diekspor ke CSV**
   (langsung terbuka di Google Sheets / Excel).
+- **Input cerdas dengan AI** (opsional, perlu setup — lihat langkah 8):
+  - 📷 **Scan struk** — foto struk dibaca **item-per-item** (toko, tanggal, harga)
+    dan ditebak kategorinya.
+  - ⚡ **Ketik cepat** — kalimat bebas seperti *"makan siang 25rb, bensin 50rb"*
+    langsung jadi transaksi.
+  - 🎤 **Voice note** — ucapkan transaksi, AI menyimak & mengisinya.
+  - Semua hasil **ditinjau & bisa diedit** sebelum disimpan. Foto/rekaman
+    **tidak disimpan** (privasi) — hanya dipakai sekali untuk membaca.
 - **Kelola kategori** keluarga (tambah/edit/hapus), dengan kategori default
   otomatis saat keluarga dibuat.
 - **Saran keuangan sehat** berbasis data (rasio tabungan, rasio pengeluaran,
@@ -39,11 +47,14 @@ js/data.js              Lapisan data (auth, RPC, query)
 js/auth.js              Alur daftar/login/lupa-password
 js/summary.js           Ringkasan + grafik kategori
 js/advice.js            Mesin saran keuangan
+js/ai.js                Input AI (scan struk / ketik cepat / voice) + tinjau
 js/app.js               Navigasi & seluruh UI aplikasi
 manifest.webmanifest    Konfigurasi PWA
 service-worker.js       Cache untuk PWA/offline
 icons/                  Ikon aplikasi (PNG)
 supabase/schema.sql     Skema tabel + RLS + fungsi (tempel ke Supabase)
+supabase/ai_phase1.sql  Migrasi kolom untuk input AI (tempel ke Supabase)
+supabase/functions/ai-parse/   Edge Function pemroses AI (Gemini)
 scripts/generate_icons.py  Skrip pembuat ikon (opsional)
 ```
 
@@ -118,6 +129,62 @@ scripts/generate_icons.py  Skrip pembuat ikon (opsional)
 
 ---
 
+## 🤖 8) Aktifkan fitur Input AI (opsional)
+
+Fitur **Scan struk / Ketik cepat / Voice note** memakai **Google Gemini** lewat
+sebuah **Supabase Edge Function** (agar API key tetap rahasia dan hanya bisa
+dipakai pengguna yang sudah login). Tanpa langkah ini, aplikasi tetap berjalan
+normal — hanya tombol AI yang akan menampilkan pesan "belum aktif".
+
+### 8a) Ambil API key Gemini (gratis)
+1. Buka <https://aistudio.google.com/app/apikey> (Google AI Studio) → **Create
+   API key**. Tersedia kuota gratis.
+2. Salin kunci (diawali `AIza...`) — disimpan sebagai secret di langkah berikut,
+   **jangan** ditaruh di kode frontend.
+
+### 8b) Jalankan migrasi kolom AI
+1. Supabase → **SQL Editor** → **New query**.
+2. Salin seluruh isi [`supabase/ai_phase1.sql`](supabase/ai_phase1.sql) → tempel
+   → **Run**. (Menambah kolom `source/store/qty/unit_price/receipt_group` pada
+   `transactions`; aman & tidak mengganggu data lama.)
+
+### 8c) Pasang Edge Function `ai-parse`
+**Cara A — lewat Dashboard (tanpa menginstal apa pun):**
+1. Supabase → menu **Edge Functions** → **Deploy a new function** (atau
+   **Create function**).
+2. Nama function: **`ai-parse`** (harus sama persis).
+3. Hapus kode contoh, lalu **tempel seluruh isi**
+   [`supabase/functions/ai-parse/index.ts`](supabase/functions/ai-parse/index.ts)
+   → **Deploy**.
+
+**Cara B — lewat CLI** (jika sudah punya Supabase CLI):
+```bash
+supabase login
+supabase link --project-ref <PROJECT_REF>
+supabase functions deploy ai-parse
+```
+
+### 8d) Isi secret API key
+- **Dashboard:** Edge Functions → buka **`ai-parse`** → **Secrets** (atau
+  **Settings**) → tambah:
+  - `GEMINI_API_KEY` = kunci dari langkah 8a.
+  - *(opsional)* `GEMINI_MODEL` = `gemini-2.0-flash` (default; bisa diganti model
+    Gemini lain).
+- **CLI:** `supabase secrets set GEMINI_API_KEY=AIza...`
+
+> `SUPABASE_URL` dan `SUPABASE_ANON_KEY` sudah tersedia otomatis di runtime —
+> tidak perlu diisi.
+
+### 8e) Coba
+Buka aplikasi → **＋ Tambah** → pilih **Scan struk / Ketik cepat / Voice note**.
+Hasil baca AI akan muncul di layar **tinjau** untuk Anda koreksi sebelum disimpan.
+
+> 💡 **Biaya & keamanan:** foto diperkecil di HP dulu agar hemat. Function
+> menolak permintaan tanpa login. Gunakan kuota gratis Gemini; pantau pemakaian
+> di Google AI Studio bila perlu.
+
+---
+
 ## 📱 Pasang ke Layar Utama (Add to Home Screen)
 - **Android (Chrome)**: buka situs → menu ⋮ → **Add to Home screen / Install app**.
 - **iPhone (Safari)**: buka situs → tombol **Share** → **Add to Home Screen**.
@@ -185,6 +252,10 @@ Aturan ini ditegakkan di **RLS** (lihat `tx_is_open` di `supabase/schema.sql`).
 | Tautan lupa password error/redirect salah | Lengkapi Site URL & Redirect URLs (langkah 4). |
 | "Gagal memuat data" setelah login | Skema/RLS belum dipasang (langkah 2). |
 | Halaman 404 di GitHub Pages | Branch/folder Pages salah, atau Pages belum aktif. |
+| Tombol AI: "Fitur AI belum aktif" | Edge Function `ai-parse` belum dipasang (langkah 8c). |
+| AI error "GEMINI_API_KEY belum diset" | Isi secret di langkah 8d. |
+| Saat simpan struk: error kolom tidak ada | Jalankan `supabase/ai_phase1.sql` (langkah 8b). |
+| Voice: "izin mikrofon ditolak" | Aktifkan izin mikrofon untuk situs di pengaturan peramban. |
 
 ---
 

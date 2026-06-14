@@ -111,7 +111,7 @@ KK.app = (function () {
     u.$$("[data-nav]").forEach((b) =>
       b.addEventListener("click", () => {
         const v = b.dataset.nav;
-        if (v === "add") openTxModal(null);
+        if (v === "add") KK.ai.openAddSheet();
         else showView(v);
       }));
   }
@@ -385,13 +385,18 @@ KK.app = (function () {
           else await KK.db.addTransaction(payload);
           close();
           u.toast(editing ? "Transaksi diperbarui." : "Transaksi ditambahkan.", "success");
-          if (state.view === "summary" || state.view === "advice" || state.view === "family") renderActiveView();
-          else showView("summary");
+          refreshAfterAdd();
         } catch (err) { u.toast(KK.auth.friendly(err), "error"); }
       } });
 
     u.openModal({ title: editing ? "Edit Transaksi" : "Tambah Transaksi", body: form, actions });
     setTimeout(() => amount.focus(), 50);
+  }
+
+  // Segarkan tampilan setelah menambah transaksi (manual atau via AI).
+  function refreshAfterAdd() {
+    if (state.view === "summary" || state.view === "advice" || state.view === "family") renderActiveView();
+    else showView("summary");
   }
 
   // Ketuk baris transaksi: edit bila milik sendiri & masih terbuka; selain itu detail.
@@ -575,7 +580,11 @@ KK.app = (function () {
     ]));
   }
 
-  return { init, state };
+  return {
+    init, state,
+    openManualTx: () => openTxModal(null),
+    refreshAfterAdd,
+  };
 })();
 
 document.addEventListener("DOMContentLoaded", () => KK.app.init());

@@ -160,6 +160,26 @@ KK.db = (function () {
       }).select(TX_COLS).single()
     );
   }
+  // Simpan banyak transaksi sekaligus (dipakai input AI: struk/teks/voice).
+  // Membawa kolom tambahan (source/store/qty/unit_price/receipt_group) yang
+  // memerlukan migrasi supabase/ai_phase1.sql.
+  async function addTransactions(list) {
+    const rows = (list || []).map((f) => ({
+      family_id: ctx.familyId,
+      user_id: ctx.userId,
+      type: f.type,
+      category_id: f.category_id || null,
+      amount: f.amount,
+      note: f.note || null,
+      tx_date: f.tx_date,
+      source: f.source || "manual",
+      store: f.store || null,
+      qty: f.qty != null ? f.qty : null,
+      unit_price: f.unit_price != null ? f.unit_price : null,
+      receipt_group: f.receipt_group || null,
+    }));
+    return unwrap(await sb().from("transactions").insert(rows).select(TX_COLS));
+  }
   async function updateTransaction(id, fields) {
     return unwrap(
       await sb().from("transactions").update({
@@ -187,6 +207,6 @@ KK.db = (function () {
     createFamily, joinFamily,
     getProfile, getFamily, updateDisplayName, getMembers,
     listCategories, addCategory, updateCategory, deleteCategory,
-    listTransactions, getTransaction, addTransaction, updateTransaction, deleteTransaction, adminUnlock,
+    listTransactions, getTransaction, addTransaction, addTransactions, updateTransaction, deleteTransaction, adminUnlock,
   };
 })();
