@@ -512,6 +512,20 @@ KK.app = (function () {
         ]));
       });
       main.appendChild(memSec);
+
+      // Bagikan & pasang aplikasi
+      const shareBtn = iconBtn("🔗 Bagikan Aplikasi", shareApp);
+      const installBtn = iconBtn("⬇️ Pasang Aplikasi", () => {
+        if (KK.install && KK.install.promptInstall) KK.install.promptInstall();
+      });
+      main.appendChild(u.el("section", { class: "card" }, [
+        u.el("h3", { class: "card-title", text: "Aplikasi" }),
+        u.el("p", { class: "muted", text: "Bagikan aplikasi ini ke keluarga, atau pasang ke layar utama perangkat Anda." }),
+        u.el("div", { class: "app-actions" }, [shareBtn, installBtn]),
+      ]));
+
+      // Kredit perancang (selalu di bagian paling bawah)
+      main.appendChild(u.el("p", { class: "app-credit", text: "Design by Muhammad Rizki Yaznil" }));
     } catch (err) { errorBox(main, err); }
   }
 
@@ -578,6 +592,22 @@ KK.app = (function () {
       u.el("p", { text: "Gagal memuat data: " + (KK.auth.friendly(err)) }),
       u.el("p", { class: "small muted", text: "Pastikan skema SQL & RLS sudah dipasang di Supabase." }),
     ]));
+  }
+
+  // Bagikan tautan aplikasi (Web Share API bila ada; jika tidak, salin tautan).
+  function shareApp() {
+    const url = location.origin + location.pathname;
+    const data = { title: "Keuangan Keluarga", text: "Yuk catat keuangan keluarga kita pakai aplikasi ini:", url };
+    if (navigator.share) {
+      navigator.share(data).catch(() => {});
+    } else if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(
+        () => u.toast("Tautan aplikasi disalin.", "success"),
+        () => u.toast("Salin manual: " + url, "info"),
+      );
+    } else {
+      u.toast("Salin manual: " + url, "info");
+    }
   }
 
   return {

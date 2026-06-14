@@ -78,6 +78,52 @@ window.KK = window.KK || {};
     showBanner(iconShare(), "Pasang di iPhone/iPad: ketuk Bagikan, lalu “Tambah ke Layar Utama”.", null);
   }
 
+  // Petunjuk manual (dipakai tombol "Pasang Aplikasi" di menu Keluarga).
+  function stepList(tag, steps) {
+    return u.el(tag, { class: "install-steps" }, steps.map(function (s) { return u.el("li", { text: s }); }));
+  }
+  function iosHelpBody() {
+    return u.el("div", { class: "install-help" }, [
+      u.el("p", { text: "Pasang di iPhone/iPad menggunakan Safari:" }),
+      stepList("ol", [
+        "Ketuk tombol Bagikan (kotak dengan panah ke atas) di bilah Safari.",
+        "Pilih “Tambah ke Layar Utama” / “Add to Home Screen”.",
+        "Ketuk “Tambah”. Ikon aplikasi akan muncul di layar utama.",
+      ]),
+    ]);
+  }
+  function genericHelpBody() {
+    return u.el("div", { class: "install-help" }, [
+      u.el("p", { text: "Pasang aplikasi ke perangkat Anda:" }),
+      stepList("ul", [
+        "Android / Chrome: buka menu ⋮, lalu pilih “Pasang aplikasi” / “Add to Home screen”.",
+        "iPhone / iPad: buka di Safari, ketuk Bagikan → “Tambah ke Layar Utama”.",
+      ]),
+    ]);
+  }
+
+  // Dipicu oleh tombol di menu Keluarga: jalankan prompt resmi bila tersedia
+  // (Android/Chrome), atau tampilkan petunjuk manual (iOS & lainnya).
+  function promptInstall() {
+    if (isStandalone()) { u.toast("Aplikasi sudah terpasang. ✅", "success"); return; }
+    var dp = window.__kkDeferredPrompt;
+    if (dp && dp.prompt) {
+      dp.prompt();
+      (dp.userChoice || Promise.resolve()).then(function (res) {
+        window.__kkDeferredPrompt = null;
+        if (res && res.outcome === "accepted") { setDismissed(); removeBanner(); }
+      });
+      return;
+    }
+    u.openModal({
+      title: "Pasang Aplikasi",
+      body: isIos() ? iosHelpBody() : genericHelpBody(),
+      actions: [{ label: "Mengerti", class: "btn-primary", onClick: function (c) { c(); } }],
+    });
+  }
+
+  KK.install = { promptInstall: promptInstall };
+
   function init() {
     if (isStandalone()) return; // sudah terpasang
 

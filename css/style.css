@@ -316,6 +316,13 @@ body.modal-open { overflow: hidden; }
 .install-action { flex-shrink: 0; white-space: nowrap; }
 .install-close { flex-shrink: 0; border: none; background: none; font-size: 1.5rem; line-height: 1; color: var(--muted); cursor: pointer; padding: 0 .15rem; }
 
+/* --------------------- Bagikan / Pasang / Kredit ----------------------- */
+.app-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
+.app-credit { text-align: center; color: var(--muted); font-size: .82rem; margin: 1.5rem 0 .5rem; }
+.install-help p { margin: 0 0 .5rem; }
+.install-steps { margin: 0; padding-left: 1.2rem; color: var(--text); display: grid; gap: .35rem; }
+.install-steps li { line-height: 1.4; }
+
 /* ------------------------------ Input AI ------------------------------- */
 /* Lembar pilihan saat menekan "Tambah" */
 .ai-opts { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; }
