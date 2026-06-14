@@ -112,13 +112,16 @@ code { background: #e2e8f0; padding: .1rem .35rem; border-radius: 6px; font-size
 .appbar-brand { display: flex; align-items: center; gap: .6rem; min-width: 0; }
 .appbar-logo { border-radius: 7px; }
 .appbar-titles { display: flex; flex-direction: column; line-height: 1.15; min-width: 0; }
-.appbar-titles strong { font-size: .98rem; }
+.appbar-titles strong { font-size: .98rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .appbar-sub { font-size: .78rem; opacity: .85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 45vw; }
 .account-btn { display: flex; align-items: center; gap: .45rem; background: rgba(255,255,255,.14); border: none; color: #fff; padding: .35rem .6rem; border-radius: 999px; cursor: pointer; font: inherit; }
 .acct-name { font-size: .85rem; font-weight: 600; max-width: 28vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .chip { font-size: .68rem; font-weight: 700; padding: .12rem .45rem; border-radius: 999px; background: #fff; color: var(--teal-700); }
 .chip-admin { background: var(--amber); color: #422006; }
 .chip-member { background: #e2e8f0; color: #334155; }
+.appbar-right { display: flex; align-items: center; gap: .5rem; flex-shrink: 0; }
+.appbar-action { display: grid; place-items: center; width: 2.1rem; height: 2.1rem; padding: 0; border: none; border-radius: 999px; background: rgba(255,255,255,.14); color: #fff; font-size: 1.15rem; line-height: 1; cursor: pointer; }
+.appbar-action.active { background: rgba(255,255,255,.34); }
 
 .main { max-width: var(--maxw); margin: 0 auto; padding: 1rem 1rem 6.5rem; }
 

@@ -164,10 +164,13 @@
           <span id="brandFamily" class="appbar-sub"></span>
         </div>
       </div>
-      <button id="accountBtn" class="account-btn" type="button">
-        <span id="acctName" class="acct-name"></span>
-        <span id="roleChip" class="chip"></span>
-      </button>
+      <div class="appbar-right">
+        <button class="appbar-action hidden" data-nav="family" type="button" aria-label="Keluarga" title="Keluarga">👨‍👩‍👧</button>
+        <button id="accountBtn" class="account-btn" type="button">
+          <span id="acctName" class="acct-name"></span>
+          <span id="roleChip" class="chip"></span>
+        </button>
+      </div>
     </header>
 
     <main id="main" class="main"></main>
@@ -177,7 +180,6 @@
       <button class="nav-item" data-nav="advice" type="button"><span class="nav-ic">💡</span><span class="nav-tx">Saran</span></button>
       <button class="nav-item nav-add" data-nav="add" type="button"><span class="nav-ic">＋</span><span class="nav-tx">Tambah</span></button>
       <button class="nav-item" data-nav="categories" type="button"><span class="nav-ic">🏷️</span><span class="nav-tx">Kategori</span></button>
-      <button class="nav-item hidden" data-nav="family" type="button"><span class="nav-ic">👨‍👩‍👧</span><span class="nav-tx">Keluarga</span></button>
       <button class="nav-item" data-nav="about" type="button"><span class="nav-ic">ℹ️</span><span class="nav-tx">Tentang</span></button>
     </nav>
   </div>
