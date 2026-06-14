@@ -12,6 +12,7 @@ KK.app = (function () {
     scope: "self",          // admin: 'self' | 'family'
     memberFilter: "",       // admin + scope family: user_id tertentu atau "" (semua)
     view: "summary",
+    analysisTab: "harga",   // tab aktif di menu Analisis: 'harga' | 'saran'
     recovering: false,
   };
 
@@ -135,7 +136,7 @@ KK.app = (function () {
   function renderActiveView() {
     const main = u.$("#main");
     if (state.view === "summary") viewSummary(main);
-    else if (state.view === "advice") viewAdvice(main);
+    else if (state.view === "advice") viewAnalysis(main);
     else if (state.view === "categories") viewCategories(main);
     else if (state.view === "family") viewFamily(main);
     else if (state.view === "about") viewAbout(main);
@@ -227,21 +228,43 @@ KK.app = (function () {
   }
 
   // ---------------------------------------------------------------------- SARAN
-  async function viewAdvice(main) {
-    loading(main);
-    try {
-      const cur = scopeForFetch();
-      const prev = Object.assign({}, cur, { month: u.prevMonth(state.month) });
-      const [thisTxs, lastTxs] = await Promise.all([
-        KK.db.listTransactions(cur), KK.db.listTransactions(prev),
-      ]);
-      u.clear(main);
-      main.appendChild(pageTitle("Saran Keuangan", u.formatBulan(state.month)));
-      main.appendChild(controlsBar({ withMemberFilter: false }));
-      const body = u.el("div", { class: "card" });
-      main.appendChild(body);
-      KK.advice.render(body, thisTxs, lastTxs);
-    } catch (err) { errorBox(main, err); }
+  async function viewAnalysis(main) {
+    u.clear(main);
+    const tab = state.analysisTab === "saran" ? "saran" : "harga";
+    main.appendChild(pageTitle("Analisis", tab === "saran" ? u.formatBulan(state.month) : "Harga & toko"));
+
+    // Pilihan bagian: Harga (perbandingan harga) | Saran (saran keuangan).
+    const seg = u.el("div", { class: "segmented" });
+    [["harga", "Harga"], ["saran", "Saran"]].forEach(([key, label]) => {
+      const b = u.el("button", { class: "seg" + (tab === key ? " active" : ""), type: "button", text: label });
+      b.addEventListener("click", () => { if (state.analysisTab !== key) { state.analysisTab = key; renderActiveView(); } });
+      seg.appendChild(b);
+    });
+    main.appendChild(u.el("div", { class: "controls" }, [
+      u.el("div", { class: "control" }, [u.el("span", { class: "control-label", text: "Tampilkan" }), seg]),
+    ]));
+
+    if (tab === "saran") main.appendChild(controlsBar({ withMemberFilter: false }));
+
+    const body = u.el("div");
+    main.appendChild(body);
+
+    if (tab === "saran") {
+      loading(body);
+      try {
+        const cur = scopeForFetch();
+        const prev = Object.assign({}, cur, { month: u.prevMonth(state.month) });
+        const [thisTxs, lastTxs] = await Promise.all([
+          KK.db.listTransactions(cur), KK.db.listTransactions(prev),
+        ]);
+        u.clear(body);
+        const card = u.el("div", { class: "card" });
+        body.appendChild(card);
+        KK.advice.render(card, thisTxs, lastTxs);
+      } catch (err) { errorBox(body, err); }
+    } else {
+      await KK.price.render(body);
+    }
   }
 
   // ------------------------------------------------------------------- KATEGORI

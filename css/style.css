@@ -330,6 +330,37 @@ body.modal-open { overflow: hidden; }
 .about-name { margin: 0 0 .25rem; }
 .about-desc { margin: 0 auto; max-width: 42ch; }
 
+/* --------------------- Analisis Harga (Fase 2) ------------------------- */
+.control-wide { width: 100%; }
+.pad { padding: .5rem; }
+.small { font-size: .72rem; }
+.price-list { display: flex; flex-direction: column; gap: .4rem; }
+.price-item { display: flex; align-items: center; justify-content: space-between; gap: .75rem; width: 100%; text-align: left; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: .55rem .7rem; cursor: pointer; font: inherit; color: var(--text); }
+.price-item:hover { border-color: var(--border-2); }
+.price-item-main { min-width: 0; display: flex; flex-direction: column; gap: .1rem; }
+.price-item-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.price-item-sub { font-size: .76rem; }
+.price-item-right { flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: .1rem; }
+.price-item-price { font-weight: 700; color: var(--teal-700); }
+.price-item-store { font-size: .72rem; }
+.price-detail { display: flex; flex-direction: column; gap: .35rem; }
+.price-sum { display: flex; gap: .6rem; }
+.price-sum-cell { flex: 1; background: var(--bg); border-radius: var(--radius-sm); padding: .55rem .65rem; }
+.price-sum-cell.is-min { background: var(--teal-50); }
+.price-sum-label { font-size: .72rem; }
+.price-sum-value { font-size: 1.05rem; font-weight: 700; }
+.price-sum-sub { font-size: .72rem; }
+.price-h { margin: .7rem 0 .15rem; font-size: .9rem; }
+.price-store { display: flex; align-items: center; justify-content: space-between; gap: .5rem; padding: .45rem .6rem; border: 1px solid var(--border); border-radius: var(--radius-sm); margin-bottom: .3rem; }
+.price-store.is-cheapest { border-color: var(--teal-600); background: var(--teal-50); }
+.price-store-name { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.price-store-vals { flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; }
+.price-store-vals .pos { font-weight: 700; }
+.price-hist { display: flex; flex-direction: column; }
+.price-hist-row { display: grid; grid-template-columns: 5.5rem 1fr auto; gap: .5rem; align-items: center; font-size: .82rem; padding: .3rem 0; border-bottom: 1px solid var(--border); }
+.price-hist-store { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.price-hist-price { font-weight: 600; }
+
 /* ------------------------------ Input AI ------------------------------- */
 /* Lembar pilihan saat menekan "Tambah" */
 .ai-opts { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; }

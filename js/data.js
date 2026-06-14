@@ -200,6 +200,11 @@ KK.db = (function () {
     return unwrap(await sb().rpc("admin_unlock_transaction", { p_tx_id: id, p_days: days || 7 }));
   }
 
+  // Fase 2: ringkasan harga se-keluarga (barang/toko/harga/tanggal) via RPC aman.
+  async function priceRows() {
+    return unwrap(await sb().rpc("price_rows")) || [];
+  }
+
   return {
     setContext, getContext,
     getSession, getUser, onAuthStateChange,
@@ -208,5 +213,6 @@ KK.db = (function () {
     getProfile, getFamily, updateDisplayName, getMembers,
     listCategories, addCategory, updateCategory, deleteCategory,
     listTransactions, getTransaction, addTransaction, addTransactions, updateTransaction, deleteTransaction, adminUnlock,
+    priceRows,
   };
 })();
