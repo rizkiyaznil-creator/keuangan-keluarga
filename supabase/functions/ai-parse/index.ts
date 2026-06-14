@@ -1,24 +1,29 @@
 // ============================================================================
-//  Edge Function: ai-parse
+//  Edge Function: ai-parse  (HIBRIDA / multi-provider)
 // ----------------------------------------------------------------------------
 //  Menerima input dari aplikasi (foto struk / teks / rekaman suara), memanggil
-//  Google Gemini, lalu mengembalikan transaksi terstruktur (JSON) untuk
-//  ditinjau pengguna sebelum disimpan.
+//  AI, lalu mengembalikan transaksi terstruktur (JSON) untuk ditinjau pengguna
+//  sebelum disimpan.
+//
+//  Pembagian penyedia (hemat + fitur tetap lengkap):
+//    - "text"  (Ketik cepat) -> DeepSeek bila DEEPSEEK_API_KEY diset (murah,
+//                               kuota terpisah). Jika belum diset -> Gemini.
+//    - "receipt" / "voice"   -> Gemini (perlu input gambar/audio native).
 //
 //  Kenapa lewat Edge Function (bukan langsung dari browser)?
-//    - API key Gemini DISIMPAN sebagai secret di server (tidak bocor ke publik).
+//    - API key DISIMPAN sebagai secret di server (tidak bocor ke publik).
 //    - Hanya pengguna yang SUDAH LOGIN yang boleh memakainya (verifikasi JWT).
 //
-//  Secret yang harus diset (Dashboard -> Edge Functions -> ai-parse -> Secrets,
-//  atau: supabase secrets set ...):
-//    GEMINI_API_KEY = <kunci dari Google AI Studio>     (WAJIB)
-//    GEMINI_MODEL   = gemini-2.0-flash                  (opsional, default ini)
+//  Secret (Dashboard -> Edge Functions -> Secrets):
+//    GEMINI_API_KEY   = <kunci Google AI Studio>       (WAJIB untuk struk/voice)
+//    GEMINI_MODEL     = gemini-2.0-flash               (opsional)
+//    DEEPSEEK_API_KEY = <kunci platform.deepseek.com>  (opsional; aktifkan teks via DeepSeek)
+//    DEEPSEEK_MODEL   = deepseek-chat                  (opsional)
 //  SUPABASE_URL & SUPABASE_ANON_KEY otomatis tersedia di runtime.
 //
 //  Cara deploy:
-//    A) Dashboard: Edge Functions -> Deploy a new function -> nama "ai-parse" ->
-//       tempel isi berkas ini -> Deploy. Lalu isi Secrets di atas.
-//    B) CLI:  supabase functions deploy ai-parse
+//    Dashboard: Edge Functions -> ai-parse -> tempel isi berkas ini -> Deploy.
+//    CLI:       supabase functions deploy ai-parse
 // ============================================================================
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -52,11 +57,6 @@ Deno.serve(async (req: Request) => {
       return json({ ok: false, error: "Sesi tidak valid. Silakan login ulang." }, 401);
     }
 
-    const apiKey = Deno.env.get("GEMINI_API_KEY");
-    if (!apiKey) {
-      return json({ ok: false, error: "Server AI belum dikonfigurasi (GEMINI_API_KEY belum diset)." }, 500);
-    }
-
     const payload = await req.json().catch(() => ({}));
     const mode = payload.mode;
     const categories = Array.isArray(payload.categories) ? payload.categories : [];
@@ -68,68 +68,136 @@ Deno.serve(async (req: Request) => {
       return json({ ok: false, error: "Mode tidak dikenali." }, 400);
     }
 
-    // --- Susun isi permintaan untuk Gemini sesuai jenis input. ---
-    const parts: Array<Record<string, unknown>> = [{ text: buildPrompt(mode, categories, today) }];
+    const prompt = buildPrompt(mode, categories, today);
 
-    if (mode === "receipt") {
-      if (!payload.image) return json({ ok: false, error: "Gambar struk kosong." }, 400);
-      parts.push({ inline_data: { mime_type: payload.imageMime || "image/jpeg", data: payload.image } });
-    } else if (mode === "voice") {
-      if (!payload.audio) return json({ ok: false, error: "Rekaman suara kosong." }, 400);
-      parts.push({ inline_data: { mime_type: payload.audioMime || "audio/wav", data: payload.audio } });
+    // --- Routing penyedia: teks -> DeepSeek (bila ada key), selain itu -> Gemini. ---
+    const deepseekKey = Deno.env.get("DEEPSEEK_API_KEY");
+    const useDeepseek = mode === "text" && !!deepseekKey;
+
+    let resultText: string;
+    if (useDeepseek) {
+      const userText = (payload.text || "").toString().trim();
+      if (!userText) return json({ ok: false, error: "Teks kosong." }, 400);
+      const r = await callDeepSeek(deepseekKey!, prompt, userText);
+      if (!r.ok) return json({ ok: false, error: r.error, detail: r.detail }, 502);
+      resultText = r.text!;
     } else {
-      const text = (payload.text || "").toString().trim();
-      if (!text) return json({ ok: false, error: "Teks kosong." }, 400);
-      parts.push({ text: '\n\nKalimat pengguna:\n"""\n' + text + '\n"""' });
-    }
+      const apiKey = Deno.env.get("GEMINI_API_KEY");
+      if (!apiKey) {
+        return json({ ok: false, error: "Server AI belum dikonfigurasi (GEMINI_API_KEY belum diset)." }, 500);
+      }
 
-    const model = Deno.env.get("GEMINI_MODEL") || "gemini-2.0-flash";
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+      // Susun isi permintaan untuk Gemini sesuai jenis input.
+      const parts: Array<Record<string, unknown>> = [{ text: prompt }];
+      if (mode === "receipt") {
+        if (!payload.image) return json({ ok: false, error: "Gambar struk kosong." }, 400);
+        parts.push({ inline_data: { mime_type: payload.imageMime || "image/jpeg", data: payload.image } });
+      } else if (mode === "voice") {
+        if (!payload.audio) return json({ ok: false, error: "Rekaman suara kosong." }, 400);
+        parts.push({ inline_data: { mime_type: payload.audioMime || "audio/wav", data: payload.audio } });
+      } else {
+        const text = (payload.text || "").toString().trim();
+        if (!text) return json({ ok: false, error: "Teks kosong." }, 400);
+        parts.push({ text: '\n\nKalimat pengguna:\n"""\n' + text + '\n"""' });
+      }
 
-    const geminiRes = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ role: "user", parts }],
-        generationConfig: { responseMimeType: "application/json", temperature: 0.1, maxOutputTokens: 8192 },
-        safetySettings: [
-          { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
-          { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
-          { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
-          { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
-        ],
-      }),
-    });
-
-    if (!geminiRes.ok) {
-      const detail = (await geminiRes.text().catch(() => "")).slice(0, 400);
-      return json({ ok: false, error: "Layanan AI menolak permintaan (" + geminiRes.status + ").", detail }, 502);
-    }
-
-    const data = await geminiRes.json();
-    const text: string = (data?.candidates?.[0]?.content?.parts || [])
-      .map((p: { text?: string }) => p.text || "").join("");
-
-    if (!text) {
-      const reason = data?.promptFeedback?.blockReason || data?.candidates?.[0]?.finishReason || "kosong";
-      return json({ ok: false, error: "AI tidak mengembalikan hasil (" + reason + ")." }, 502);
+      const r = await callGemini(apiKey, parts);
+      if (!r.ok) return json({ ok: false, error: r.error, detail: r.detail }, 502);
+      resultText = r.text!;
     }
 
     let parsed: unknown;
     try {
-      parsed = JSON.parse(text);
+      parsed = JSON.parse(resultText);
     } catch {
       return json({ ok: false, error: "Hasil AI tidak berformat JSON yang valid." }, 502);
     }
 
-    return json({ ok: true, mode, result: parsed });
+    return json({ ok: true, mode, result: parsed, provider: useDeepseek ? "deepseek" : "gemini" });
   } catch (e) {
     return json({ ok: false, error: "Kesalahan server: " + ((e as Error)?.message || String(e)) }, 500);
   }
 });
 
+interface CallResult {
+  ok: boolean;
+  text?: string;
+  error?: string;
+  detail?: string;
+}
+
 // ---------------------------------------------------------------------------
-//  Susun instruksi (prompt) untuk Gemini.
+//  Penyedia: Google Gemini — mendukung teks + gambar + audio dalam satu API.
+// ---------------------------------------------------------------------------
+async function callGemini(apiKey: string, parts: Array<Record<string, unknown>>): Promise<CallResult> {
+  const model = Deno.env.get("GEMINI_MODEL") || "gemini-2.0-flash";
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      contents: [{ role: "user", parts }],
+      generationConfig: { responseMimeType: "application/json", temperature: 0.1, maxOutputTokens: 8192 },
+      safetySettings: [
+        { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+        { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+        { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+        { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
+      ],
+    }),
+  });
+
+  if (!res.ok) {
+    const detail = (await res.text().catch(() => "")).slice(0, 400);
+    return { ok: false, error: "Layanan AI (Gemini) menolak permintaan (" + res.status + ").", detail };
+  }
+
+  const data = await res.json();
+  const text: string = (data?.candidates?.[0]?.content?.parts || [])
+    .map((p: { text?: string }) => p.text || "").join("");
+
+  if (!text) {
+    const reason = data?.promptFeedback?.blockReason || data?.candidates?.[0]?.finishReason || "kosong";
+    return { ok: false, error: "AI (Gemini) tidak mengembalikan hasil (" + reason + ")." };
+  }
+  return { ok: true, text };
+}
+
+// ---------------------------------------------------------------------------
+//  Penyedia: DeepSeek (OpenAI-compatible, TEKS saja) — untuk "Ketik cepat".
+// ---------------------------------------------------------------------------
+async function callDeepSeek(apiKey: string, systemPrompt: string, userText: string): Promise<CallResult> {
+  const model = Deno.env.get("DEEPSEEK_MODEL") || "deepseek-chat";
+
+  const res = await fetch("https://api.deepseek.com/chat/completions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Authorization": "Bearer " + apiKey },
+    body: JSON.stringify({
+      model,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: 'Kalimat pengguna:\n"""\n' + userText + '\n"""' },
+      ],
+      temperature: 0.1,
+      max_tokens: 4096,
+      response_format: { type: "json_object" },
+    }),
+  });
+
+  if (!res.ok) {
+    const detail = (await res.text().catch(() => "")).slice(0, 400);
+    return { ok: false, error: "Layanan AI (DeepSeek) menolak permintaan (" + res.status + ").", detail };
+  }
+
+  const data = await res.json();
+  const text: string = data?.choices?.[0]?.message?.content || "";
+  if (!text) return { ok: false, error: "AI (DeepSeek) tidak mengembalikan hasil." };
+  return { ok: true, text };
+}
+
+// ---------------------------------------------------------------------------
+//  Susun instruksi (prompt) untuk model. Dipakai semua penyedia.
 // ---------------------------------------------------------------------------
 function buildPrompt(
   mode: string,

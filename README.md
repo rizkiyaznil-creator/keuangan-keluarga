@@ -167,10 +167,19 @@ supabase functions deploy ai-parse
 ### 8d) Isi secret API key
 - **Dashboard:** Edge Functions → buka **`ai-parse`** → **Secrets** (atau
   **Settings**) → tambah:
-  - `GEMINI_API_KEY` = kunci dari langkah 8a.
+  - `GEMINI_API_KEY` = kunci dari langkah 8a. **(wajib untuk Scan struk & Voice)**
   - *(opsional)* `GEMINI_MODEL` = `gemini-2.0-flash` (default; bisa diganti model
     Gemini lain).
+  - *(opsional)* `DEEPSEEK_API_KEY` = kunci dari [platform.deepseek.com](https://platform.deepseek.com).
+    Bila diisi, mode **Ketik cepat (teks)** dilayani DeepSeek (lebih murah &
+    kuota terpisah dari Gemini); Scan struk & Voice tetap memakai Gemini. Bila
+    kosong, teks otomatis memakai Gemini.
+  - *(opsional)* `DEEPSEEK_MODEL` = `deepseek-chat` (default).
 - **CLI:** `supabase secrets set GEMINI_API_KEY=AIza...`
+
+> **Hibrida hemat:** teks → DeepSeek (jika ada key), struk/voice → Gemini.
+> DeepSeek hanya memproses teks (tak bisa baca gambar/audio), jadi Gemini tetap
+> diperlukan untuk Scan struk & Voice note.
 
 > `SUPABASE_URL` dan `SUPABASE_ANON_KEY` sudah tersedia otomatis di runtime —
 > tidak perlu diisi.
