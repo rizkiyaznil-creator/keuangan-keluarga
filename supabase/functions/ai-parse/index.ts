@@ -16,7 +16,7 @@
 //
 //  Secret (Dashboard -> Edge Functions -> Secrets):
 //    GEMINI_API_KEY   = <kunci Google AI Studio>       (WAJIB untuk struk/voice)
-//    GEMINI_MODEL     = gemini-2.0-flash               (opsional)
+//    GEMINI_MODEL     = gemini-2.5-flash               (opsional, default ini)
 //    DEEPSEEK_API_KEY = <kunci platform.deepseek.com>  (opsional; aktifkan teks via DeepSeek)
 //    DEEPSEEK_MODEL   = deepseek-chat                  (opsional)
 //  SUPABASE_URL & SUPABASE_ANON_KEY otomatis tersedia di runtime.
@@ -130,7 +130,7 @@ interface CallResult {
 //  Penyedia: Google Gemini — mendukung teks + gambar + audio dalam satu API.
 // ---------------------------------------------------------------------------
 async function callGemini(apiKey: string, parts: Array<Record<string, unknown>>): Promise<CallResult> {
-  const model = Deno.env.get("GEMINI_MODEL") || "gemini-2.0-flash";
+  const model = Deno.env.get("GEMINI_MODEL") || "gemini-2.5-flash";
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
   const res = await fetch(url, {

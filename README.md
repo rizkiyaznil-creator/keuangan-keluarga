@@ -168,8 +168,9 @@ supabase functions deploy ai-parse
 - **Dashboard:** Edge Functions → buka **`ai-parse`** → **Secrets** (atau
   **Settings**) → tambah:
   - `GEMINI_API_KEY` = kunci dari langkah 8a. **(wajib untuk Scan struk & Voice)**
-  - *(opsional)* `GEMINI_MODEL` = `gemini-2.0-flash` (default; bisa diganti model
-    Gemini lain).
+  - *(opsional)* `GEMINI_MODEL` = `gemini-2.5-flash` (default; bisa diganti model
+    Gemini lain yang masih aktif). **Jangan pakai model yang sudah dipensiunkan
+    (mis. `gemini-2.0-flash-lite`) — akan error 404 NOT_FOUND.**
   - *(opsional)* `DEEPSEEK_API_KEY` = kunci dari [platform.deepseek.com](https://platform.deepseek.com).
     Bila diisi, mode **Ketik cepat (teks)** dilayani DeepSeek (lebih murah &
     kuota terpisah dari Gemini); Scan struk & Voice tetap memakai Gemini. Bila
