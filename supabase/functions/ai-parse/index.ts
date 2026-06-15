@@ -114,7 +114,9 @@ Deno.serve(async (req: Request) => {
         }, preferDeepseek ? 502 : 500);
       }
       const parts = buildGeminiParts(mode, payload, prompt);
-      const r = await callGemini(geminiKey, parts);
+      // Struk: sedikit anggaran nalar (256); lainnya matikan demi hemat.
+      const thinkingBudget = mode === "receipt" ? 256 : 0;
+      const r = await callGemini(geminiKey, parts, thinkingBudget);
       if (!r.ok) {
         const err = preferDeepseek ? ("DeepSeek lalu Gemini sama-sama gagal. " + r.error) : r.error;
         return json({ ok: false, error: err, detail: r.detail }, 502);
@@ -146,7 +148,11 @@ interface CallResult {
 // ---------------------------------------------------------------------------
 //  Penyedia: Google Gemini — mendukung teks + gambar + audio dalam satu API.
 // ---------------------------------------------------------------------------
-async function callGemini(apiKey: string, parts: Array<Record<string, unknown>>): Promise<CallResult> {
+async function callGemini(
+  apiKey: string,
+  parts: Array<Record<string, unknown>>,
+  thinkingBudget = 0,
+): Promise<CallResult> {
   const model = Deno.env.get("GEMINI_MODEL") || "gemini-2.5-flash";
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
@@ -155,7 +161,14 @@ async function callGemini(apiKey: string, parts: Array<Record<string, unknown>>)
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       contents: [{ role: "user", parts }],
-      generationConfig: { responseMimeType: "application/json", temperature: 0.1, maxOutputTokens: 8192 },
+      generationConfig: {
+        responseMimeType: "application/json",
+        temperature: 0.1,
+        maxOutputTokens: 8192,
+        // Hemat biaya: token "thinking" ditagih sebagai output. 0 = mati
+        // (teks/voice/saran); struk diberi sedikit anggaran sebagai jaring pengaman.
+        thinkingConfig: { thinkingBudget },
+      },
       safetySettings: [
         { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
         { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },

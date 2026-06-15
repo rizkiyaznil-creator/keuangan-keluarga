@@ -303,7 +303,8 @@ KK.ai = (function () {
       const host = m.body;
       processAndReview(host, m, "Membaca struk…",
         async () => {
-          const img = await downscaleImage(file);
+          // Hemat token gambar: turunkan resolusi (1600->1200) & kualitas (0.82->0.7).
+          const img = await downscaleImage(file, 1200, 0.7);
           return { mode: "receipt", image: img.data, imageMime: img.mime, categories: categoriesPayload(), today: u.todayISO() };
         },
         (h, mm, result) => renderReceiptReview(h, mm, result));
