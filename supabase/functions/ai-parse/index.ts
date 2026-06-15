@@ -9,7 +9,7 @@
 //    - "text"  (Ketik cepat) -> DeepSeek bila DEEPSEEK_API_KEY diset (murah,
 //                               kuota terpisah). Jika belum diset -> Gemini.
 //    - "receipt" / "voice"   -> Gemini (perlu input gambar/audio native).
-//    - "advice" (Saran AI)   -> DeepSeek bila ada (teks), selain itu Gemini.
+//    - "advice" (Saran AI)   -> DeepSeek DIUTAMAKAN bila ada; fallback otomatis ke Gemini.
 //                               Input hanya RINGKASAN ANGKA agregat (tanpa data pribadi).
 //
 //  Kenapa lewat Edge Function (bukan langsung dari browser)?
@@ -72,50 +72,55 @@ Deno.serve(async (req: Request) => {
 
     const prompt = buildPrompt(mode, categories, today);
 
-    // --- Routing penyedia: teks -> DeepSeek (bila ada key), selain itu -> Gemini. ---
-    const deepseekKey = Deno.env.get("DEEPSEEK_API_KEY");
-    const useDeepseek = (mode === "text" || mode === "advice") && !!deepseekKey;
+    // --- Validasi input per-mode (sebelum memanggil penyedia mana pun). ---
+    if (mode === "receipt" && !payload.image) return json({ ok: false, error: "Gambar struk kosong." }, 400);
+    if (mode === "voice" && !payload.audio) return json({ ok: false, error: "Rekaman suara kosong." }, 400);
+    if (mode === "advice" && (!payload.summary || typeof payload.summary !== "object")) {
+      return json({ ok: false, error: "Ringkasan angka kosong." }, 400);
+    }
+    if (mode === "text" && !(payload.text || "").toString().trim()) {
+      return json({ ok: false, error: "Teks kosong." }, 400);
+    }
 
-    let resultText: string;
-    if (useDeepseek) {
-      if (mode === "advice" && (!payload.summary || typeof payload.summary !== "object")) {
-        return json({ ok: false, error: "Ringkasan angka kosong." }, 400);
-      }
+    // --- Routing penyedia ---
+    //   text/advice : DeepSeek DIUTAMAKAN bila DEEPSEEK_API_KEY ada; bila gagal,
+    //                 otomatis fallback ke Gemini. receipt/voice : selalu Gemini.
+    const geminiKey = Deno.env.get("GEMINI_API_KEY");
+    const deepseekKey = Deno.env.get("DEEPSEEK_API_KEY");
+    const preferDeepseek = (mode === "text" || mode === "advice") && !!deepseekKey;
+
+    let resultText: string | null = null;
+    let provider = "";
+    let dsErr = "";
+
+    // 1) Coba DeepSeek lebih dulu (teks/saran).
+    if (preferDeepseek) {
       const userText = mode === "advice"
         ? "DATA RINGKASAN (JSON):\n" + JSON.stringify(payload.summary || {})
         : (payload.text || "").toString().trim();
-      if (mode !== "advice" && !userText) return json({ ok: false, error: "Teks kosong." }, 400);
       const r = await callDeepSeek(deepseekKey!, prompt, userText);
-      if (!r.ok) return json({ ok: false, error: r.error, detail: r.detail }, 502);
-      resultText = r.text!;
-    } else {
-      const apiKey = Deno.env.get("GEMINI_API_KEY");
-      if (!apiKey) {
-        return json({ ok: false, error: "Server AI belum dikonfigurasi (GEMINI_API_KEY belum diset)." }, 500);
-      }
+      if (r.ok) { resultText = r.text!; provider = "deepseek"; }
+      else { dsErr = r.error || "DeepSeek gagal."; }
+    }
 
-      // Susun isi permintaan untuk Gemini sesuai jenis input.
-      const parts: Array<Record<string, unknown>> = [{ text: prompt }];
-      if (mode === "receipt") {
-        if (!payload.image) return json({ ok: false, error: "Gambar struk kosong." }, 400);
-        parts.push({ inline_data: { mime_type: payload.imageMime || "image/jpeg", data: payload.image } });
-      } else if (mode === "voice") {
-        if (!payload.audio) return json({ ok: false, error: "Rekaman suara kosong." }, 400);
-        parts.push({ inline_data: { mime_type: payload.audioMime || "audio/wav", data: payload.audio } });
-      } else if (mode === "advice") {
-        if (!payload.summary || typeof payload.summary !== "object") {
-          return json({ ok: false, error: "Ringkasan angka kosong." }, 400);
-        }
-        parts.push({ text: "\n\nDATA RINGKASAN (JSON):\n" + JSON.stringify(payload.summary) });
-      } else {
-        const text = (payload.text || "").toString().trim();
-        if (!text) return json({ ok: false, error: "Teks kosong." }, 400);
-        parts.push({ text: '\n\nKalimat pengguna:\n"""\n' + text + '\n"""' });
+    // 2) Gemini: penyedia utama (receipt/voice/tanpa key DeepSeek) ATAU fallback bila DeepSeek gagal.
+    if (resultText === null) {
+      if (!geminiKey) {
+        return json({
+          ok: false,
+          error: preferDeepseek
+            ? ("Saran via DeepSeek gagal dan Gemini belum disiapkan sebagai cadangan. " + dsErr)
+            : "Server AI belum dikonfigurasi (GEMINI_API_KEY belum diset).",
+        }, preferDeepseek ? 502 : 500);
       }
-
-      const r = await callGemini(apiKey, parts);
-      if (!r.ok) return json({ ok: false, error: r.error, detail: r.detail }, 502);
+      const parts = buildGeminiParts(mode, payload, prompt);
+      const r = await callGemini(geminiKey, parts);
+      if (!r.ok) {
+        const err = preferDeepseek ? ("DeepSeek lalu Gemini sama-sama gagal. " + r.error) : r.error;
+        return json({ ok: false, error: err, detail: r.detail }, 502);
+      }
       resultText = r.text!;
+      provider = preferDeepseek ? "gemini (fallback)" : "gemini";
     }
 
     let parsed: unknown;
@@ -125,7 +130,7 @@ Deno.serve(async (req: Request) => {
       return json({ ok: false, error: "Hasil AI tidak berformat JSON yang valid." }, 502);
     }
 
-    return json({ ok: true, mode, result: parsed, provider: useDeepseek ? "deepseek" : "gemini" });
+    return json({ ok: true, mode, result: parsed, provider });
   } catch (e) {
     return json({ ok: false, error: "Kesalahan server: " + ((e as Error)?.message || String(e)) }, 500);
   }
@@ -206,6 +211,27 @@ async function callDeepSeek(apiKey: string, systemPrompt: string, userText: stri
   const text: string = data?.choices?.[0]?.message?.content || "";
   if (!text) return { ok: false, error: "AI (DeepSeek) tidak mengembalikan hasil." };
   return { ok: true, text };
+}
+
+// ---------------------------------------------------------------------------
+//  Susun "parts" untuk Gemini sesuai jenis input (dipakai jalur utama & fallback).
+// ---------------------------------------------------------------------------
+function buildGeminiParts(
+  mode: string,
+  payload: Record<string, any>,
+  prompt: string,
+): Array<Record<string, unknown>> {
+  const parts: Array<Record<string, unknown>> = [{ text: prompt }];
+  if (mode === "receipt") {
+    parts.push({ inline_data: { mime_type: payload.imageMime || "image/jpeg", data: payload.image } });
+  } else if (mode === "voice") {
+    parts.push({ inline_data: { mime_type: payload.audioMime || "audio/wav", data: payload.audio } });
+  } else if (mode === "advice") {
+    parts.push({ text: "\n\nDATA RINGKASAN (JSON):\n" + JSON.stringify(payload.summary) });
+  } else {
+    parts.push({ text: '\n\nKalimat pengguna:\n"""\n' + (payload.text || "").toString().trim() + '\n"""' });
+  }
+  return parts;
 }
 
 // ---------------------------------------------------------------------------
