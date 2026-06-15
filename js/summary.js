@@ -25,19 +25,21 @@ KK.summary = (function () {
   }
 
   function compute(transactions) {
-    let income = 0, expense = 0;
-    const inc = new Map(), exp = new Map();
+    let income = 0, expense = 0, investment = 0;
+    const inc = new Map(), exp = new Map(), invMap = new Map();
     transactions.forEach((t) => {
       const amt = Number(t.amount) || 0;
       const key = t.category_name || "Tanpa kategori";
       if (t.type === "income") { income += amt; inc.set(key, (inc.get(key) || 0) + amt); }
+      else if (t.type === "investment") { investment += amt; invMap.set(key, (invMap.get(key) || 0) + amt); }
       else { expense += amt; exp.set(key, (exp.get(key) || 0) + amt); }
     });
     const expenseByCategory = buildCats(exp, expense);
     const incomeByCategory = buildCats(inc, income);
+    const investmentByCategory = buildCats(invMap, investment);
     return {
-      income, expense, balance: income - expense,
-      expenseByCategory, incomeByCategory,
+      income, expense, investment, balance: income - expense - investment,
+      expenseByCategory, incomeByCategory, investmentByCategory,
       byCategory: expenseByCategory, // kompatibilitas lama
     };
   }
@@ -49,6 +51,11 @@ KK.summary = (function () {
       u.el("div", { class: "stat-value", text: u.formatRupiah(value) }),
     ]);
   }
+
+  // Tampilan arah arus per jenis: pemasukan (+, hijau), investasi (−, indigo), pengeluaran (−, merah).
+  function flowClass(type) { return type === "income" ? "pos" : type === "investment" ? "inv" : "neg"; }
+  function flowSign(type) { return type === "income" ? "+ " : "− "; }
+  function typeLabel(type) { return type === "income" ? "Pemasukan" : type === "investment" ? "Investasi" : "Pengeluaran"; }
 
   function segmented(opts, current, onChange) {
     const wrap = u.el("div", { class: "segmented" });
@@ -128,7 +135,7 @@ KK.summary = (function () {
           t.note ? u.el("div", { class: "td-note", text: t.note }) : null,
         ]),
         showWho ? u.el("td", { class: "td-who", text: memberMap[t.user_id] || "—" }) : null,
-        u.el("td", { class: "td-amt ta-right " + (isIncome ? "pos" : "neg"), text: (isIncome ? "+ " : "− ") + u.formatRupiah(t.amount) }),
+        u.el("td", { class: "td-amt ta-right " + flowClass(t.type), text: flowSign(t.type) + u.formatRupiah(t.amount) }),
       ]);
       if (data.onEditTx) { tr.classList.add("clickable"); tr.addEventListener("click", () => data.onEditTx(t)); }
       tbody.appendChild(tr);
@@ -157,7 +164,7 @@ KK.summary = (function () {
       const isIncome = g.type === "income";
       const head = u.el("div", { class: "cat-group-head" }, [
         u.el("span", { class: "cat-group-name" }, [g.name, u.el("span", { class: "cat-group-count", text: " (" + g.items.length + ")" })]),
-        u.el("span", { class: "cat-group-total " + (isIncome ? "pos" : "neg"), text: (isIncome ? "+ " : "− ") + u.formatRupiah(g.total) }),
+        u.el("span", { class: "cat-group-total " + flowClass(g.type), text: flowSign(g.type) + u.formatRupiah(g.total) }),
       ]);
       const thead = u.el("thead", {}, [u.el("tr", {}, [
         u.el("th", { text: "Tgl" }), u.el("th", { text: "Catatan" }),
@@ -170,7 +177,7 @@ KK.summary = (function () {
           u.el("td", { class: "td-date" }, [u.formatTanggal(t.tx_date), (data.isLocked && data.isLocked(t)) ? u.el("span", { class: "lock-badge", title: "Final", text: " 🔒" }) : null]),
           u.el("td", { class: "td-cat", text: t.note || "—" }),
           showWho ? u.el("td", { class: "td-who", text: memberMap[t.user_id] || "—" }) : null,
-          u.el("td", { class: "td-amt ta-right " + (isIncome ? "pos" : "neg"), text: (isIncome ? "+ " : "− ") + u.formatRupiah(t.amount) }),
+          u.el("td", { class: "td-amt ta-right " + flowClass(t.type), text: flowSign(t.type) + u.formatRupiah(t.amount) }),
         ]);
         if (data.onEditTx) { tr.classList.add("clickable"); tr.addEventListener("click", () => data.onEditTx(t)); }
         tbody.appendChild(tr);
@@ -185,7 +192,7 @@ KK.summary = (function () {
     const headers = ["Tanggal", "Jenis", "Kategori", "Anggota", "Catatan", "Jumlah"];
     const rows = txs.map((t) => [
       t.tx_date,
-      t.type === "income" ? "Pemasukan" : "Pengeluaran",
+      typeLabel(t.type),
       t.category_name || "",
       (memberMap && memberMap[t.user_id]) || "",
       t.note || "",
@@ -205,7 +212,8 @@ KK.summary = (function () {
     container.appendChild(u.el("div", { class: "stats-grid" }, [
       statCard("Pemasukan", r.income, "income"),
       statCard("Pengeluaran", r.expense, "expense"),
-      statCard("Saldo", r.balance, r.balance >= 0 ? "balance-pos" : "balance-neg"),
+      statCard("Investasi", r.investment, "investment"),
+      statCard("Sisa", r.balance, r.balance >= 0 ? "balance-pos" : "balance-neg"),
     ]));
 
     // Kartu grafik (default: Pengeluaran + Diagram pie)
@@ -214,14 +222,14 @@ KK.summary = (function () {
     container.appendChild(chartCard);
     function renderChartCard() {
       u.clear(chartCard);
-      const items = chartType === "expense" ? r.expenseByCategory : r.incomeByCategory;
-      const total = chartType === "expense" ? r.expense : r.income;
+      const items = chartType === "income" ? r.incomeByCategory : chartType === "investment" ? r.investmentByCategory : r.expenseByCategory;
+      const total = chartType === "income" ? r.income : chartType === "investment" ? r.investment : r.expense;
       chartCard.appendChild(u.el("div", { class: "card-head" }, [
-        u.el("h3", { class: "card-title", text: (chartType === "expense" ? "Pengeluaran" : "Pemasukan") + " per Kategori" }),
+        u.el("h3", { class: "card-title", text: typeLabel(chartType) + " per Kategori" }),
         u.el("span", { class: "count-badge", text: u.formatRupiah(total) }),
       ]));
       chartCard.appendChild(u.el("div", { class: "chart-controls" }, [
-        segmented([{ value: "expense", label: "Pengeluaran" }, { value: "income", label: "Pemasukan" }], chartType, (v) => { chartType = v; renderChartCard(); }),
+        segmented([{ value: "expense", label: "Pengeluaran" }, { value: "income", label: "Pemasukan" }, { value: "investment", label: "Investasi" }], chartType, (v) => { chartType = v; renderChartCard(); }),
         segmented([{ value: "bar", label: "Diagram batang" }, { value: "pie", label: "Diagram pie" }], chartStyle, (v) => { chartStyle = v; renderChartCard(); }),
       ]));
       const body = u.el("div", {});

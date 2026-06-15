@@ -8,10 +8,11 @@ KK.advice = (function () {
   const u = KK.util;
 
   function totals(txs) {
-    let income = 0, expense = 0, savings = 0;
+    let income = 0, expense = 0, savings = 0, investment = 0;
     const catMap = new Map();
     txs.forEach((t) => {
       if (t.type === "income") income += t.amount;
+      else if (t.type === "investment") investment += t.amount;
       else {
         expense += t.amount;
         const name = t.category_name || "Tanpa kategori";
@@ -21,7 +22,7 @@ KK.advice = (function () {
     });
     let topCat = null;
     catMap.forEach((total, name) => { if (!topCat || total > topCat.total) topCat = { name, total }; });
-    return { income, expense, savings, balance: income - expense, topCat };
+    return { income, expense, savings, investment, balance: income - expense, topCat };
   }
 
   function pct(n) { return Math.round(n) + "%"; }
@@ -51,6 +52,14 @@ KK.advice = (function () {
       items.push({ level: "warn", icon: "💡", title: "Tabungan masih " + pct(savingRatio),
         text: "Idealnya tabungan minimal 20% dari pemasukan. Coba sisihkan sekitar " +
               u.formatRupiah(Math.max(0, t.income * 0.2 - t.savings)) + " lagi bulan ini ke kategori \"Tabungan\"." });
+    }
+
+    // 1b) Alokasi investasi (jika ada) — diperlakukan positif, bukan beban.
+    if (t.investment > 0) {
+      const invPct = t.income > 0 ? (t.investment / t.income) * 100 : 0;
+      items.push({ level: "good", icon: "📈", title: "Alokasi investasi" + (t.income > 0 ? " (" + pct(invPct) + ")" : ""),
+        text: "Kamu menanam " + u.formatRupiah(t.investment) + " ke investasi bulan ini" +
+              (t.income > 0 ? " (" + pct(invPct) + " dari pemasukan)" : "") + ". Mantap — uang ini bekerja untuk masa depan." });
     }
 
     // 2) Rasio pengeluaran / pemasukan & defisit
@@ -161,6 +170,7 @@ KK.advice = (function () {
       pengeluaran: r(t.expense),
       saldo: r(t.balance),
       tabungan: r(t.savings),
+      investasi: r(t.investment),
       rasio_tabungan_persen: t.income > 0 ? Math.round((t.savings / t.income) * 100) : null,
       rasio_pengeluaran_persen: t.income > 0 ? Math.round((t.expense / t.income) * 100) : null,
       kategori_pengeluaran: kategori,

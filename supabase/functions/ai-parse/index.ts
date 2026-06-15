@@ -274,6 +274,7 @@ function buildPrompt(
       "Anda menerima RINGKASAN ANGKA keuangan satu bulan dalam JSON (bukan transaksi mentah, tanpa nama orang).",
       "Arti field: bulan (YYYY-MM); lingkup ('Saya' atau 'Keluarga'); pemasukan; pengeluaran; " +
         "saldo (=pemasukan-pengeluaran, negatif berarti defisit); tabungan (nominal pada kategori 'Tabungan'); " +
+        "investasi (uang ditanam ke aset, perlakukan positif); " +
         "rasio_tabungan_persen; rasio_pengeluaran_persen; kategori_pengeluaran (daftar {nama, jumlah}, terbesar dahulu); " +
         "pengeluaran_bulan_lalu (boleh null).",
       "ATURAN:",
@@ -316,11 +317,16 @@ function buildPrompt(
     "Untuk tiap transaksi/item, pilih kategori dari daftar di atas yang paling cocok " +
     "(SALIN nama persis, perhatikan jenis pengeluaran/pemasukan). Bila ragu atau tidak ada yang cocok, isi null.";
 
+  const investRule =
+    "tx_type 'investment' KHUSUS untuk menyetor/membeli ASET INVESTASI (reksadana, saham, emas, " +
+    "deposito, obligasi, crypto, dll) — BUKAN pengeluaran konsumsi. Hasil/penarikan investasi " +
+    "(jual untung, dividen) dihitung sebagai 'income'.";
+
   if (mode === "import") {
     return [
       "Anda membaca MUTASI REKENING BANK atau RIWAYAT TRANSAKSI dompet digital (GoPay/OVO/DANA, dsb), " +
         "dari gambar (screenshot) ATAU teks, lalu mengubahnya menjadi DAFTAR transaksi JSON.",
-      catBlock, moneyRule, dateRule, catRule,
+      catBlock, moneyRule, dateRule, catRule, investRule,
       "Setiap baris transaksi menjadi satu objek. ABAIKAN baris non-transaksi: saldo awal/akhir, " +
         "subtotal/total, header kolom, nomor halaman, info pemilik/nomor rekening.",
       "tx_type: 'expense' untuk dana KELUAR (debet, pembayaran, pembelian, transfer keluar, top-up keluar); " +
@@ -336,7 +342,7 @@ function buildPrompt(
       '  "type": "list",',
       '  "transactions": [',
       "    {",
-      '      "tx_type": "expense"|"income",',
+      '      "tx_type": "expense"|"income"|"investment",',
       '      "amount": number,',
       '      "category": string|null,',
       '      "date": "YYYY-MM-DD",',
@@ -386,7 +392,7 @@ function buildPrompt(
   const lines = [
     intro,
     "Ubah menjadi satu atau beberapa transaksi keuangan.",
-    catBlock, moneyRule, dateRule, catRule,
+    catBlock, moneyRule, dateRule, catRule, investRule,
     "Keluarkan HANYA JSON valid dengan bentuk persis berikut:",
     "{",
     '  "type": "list",',

@@ -382,11 +382,11 @@ KK.app = (function () {
       addBtn.addEventListener("click", () => openCategoryModal(null));
       main.appendChild(u.el("div", { class: "actions-row" }, [addBtn]));
 
-      ["expense", "income"].forEach((type) => {
+      ["expense", "income", "investment"].forEach((type) => {
         const list = state.categories.filter((c) => c.type === type)
           .sort((a, b) => ((mine(a) ? 0 : 1) - (mine(b) ? 0 : 1)) || a.name.localeCompare(b.name));
         const sec = u.el("section", { class: "card" }, [
-          u.el("h3", { class: "card-title", text: type === "expense" ? "Pengeluaran" : "Pemasukan" }),
+          u.el("h3", { class: "card-title", text: type === "expense" ? "Pengeluaran" : type === "income" ? "Pemasukan" : "Investasi" }),
         ]);
         if (!list.length) sec.appendChild(u.el("p", { class: "muted", text: "Belum ada kategori." }));
         list.forEach((c) => {
@@ -416,6 +416,7 @@ KK.app = (function () {
     const typeSel = u.el("select", { class: "input" }, [
       u.el("option", { value: "expense", text: "Pengeluaran" }),
       u.el("option", { value: "income", text: "Pemasukan" }),
+      u.el("option", { value: "investment", text: "Investasi" }),
     ]);
     typeSel.value = editing ? cat.type : "expense";
     form.appendChild(field("Jenis", typeSel));
@@ -538,6 +539,7 @@ KK.app = (function () {
     };
     typeSeg.appendChild(mkType("expense", "Pengeluaran"));
     typeSeg.appendChild(mkType("income", "Pemasukan"));
+    typeSeg.appendChild(mkType("investment", "Investasi"));
     form.appendChild(field("Jenis", typeSeg));
 
     const amount = u.el("input", { class: "input", type: "text", inputmode: "numeric", placeholder: "0" });

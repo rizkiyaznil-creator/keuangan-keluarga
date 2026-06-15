@@ -9,6 +9,7 @@
   --amber:    #f59e0b;
   --green:    #16a34a;
   --red:      #dc2626;
+  --indigo:   #4f46e5;
 
   --bg:       #f1f5f9;
   --card:     #ffffff;
@@ -164,8 +165,9 @@ code { background: #e2e8f0; padding: .1rem .35rem; border-radius: 6px; font-size
 .stat-card { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); padding: .85rem .9rem; border-left: 4px solid var(--border-2); }
 .stat-card.income { border-left-color: var(--green); }
 .stat-card.expense { border-left-color: var(--red); }
-.stat-card.balance-pos { border-left-color: var(--teal-600); grid-column: 1 / -1; }
-.stat-card.balance-neg { border-left-color: var(--amber); grid-column: 1 / -1; }
+.stat-card.investment { border-left-color: var(--indigo); }
+.stat-card.balance-pos { border-left-color: var(--teal-600); }
+.stat-card.balance-neg { border-left-color: var(--amber); }
 .stat-label { font-size: .78rem; color: var(--muted); font-weight: 600; }
 .stat-value { font-size: 1.25rem; font-weight: 800; margin-top: .15rem; }
 
@@ -196,6 +198,7 @@ code { background: #e2e8f0; padding: .1rem .35rem; border-radius: 6px; font-size
 .tx-amt { font-weight: 800; white-space: nowrap; }
 .pos { color: var(--green); }
 .neg { color: var(--red); }
+.inv { color: var(--indigo); }
 
 /* Tabel transaksi + ekspor */
 .card-head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; flex-wrap: wrap; margin-bottom: .6rem; }
@@ -430,8 +433,7 @@ body.modal-open { overflow: hidden; }
 
 /* ------------------------------ Desktop -------------------------------- */
 @media (min-width: 768px) {
-  .stats-grid { grid-template-columns: 1fr 1fr 1fr; }
-  .stat-card.balance-pos, .stat-card.balance-neg { grid-column: auto; }
+  .stats-grid { grid-template-columns: repeat(4, 1fr); }
   .modal-overlay { place-items: center; }
   .modal { border-radius: 18px; transform: translateY(0) scale(.98); }
   .modal-overlay.show .modal { transform: scale(1); }

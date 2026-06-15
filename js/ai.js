@@ -624,6 +624,7 @@ KK.ai = (function () {
       };
       typeSeg.appendChild(mkType("expense", "Pengeluaran"));
       typeSeg.appendChild(mkType("income", "Pemasukan"));
+      typeSeg.appendChild(mkType("investment", "Investasi"));
 
       const dateInp = u.el("input", { class: "input", type: "date", value: (tx.date && /^\d{4}-\d{2}-\d{2}$/.test(tx.date)) ? tx.date : u.todayISO() });
       const noteInp = u.el("input", { class: "input", type: "text", value: tx.note || "", placeholder: "Catatan" });
