@@ -208,7 +208,7 @@ KK.summary = (function () {
       statCard("Saldo", r.balance, r.balance >= 0 ? "balance-pos" : "balance-neg"),
     ]));
 
-    // Kartu grafik (default: Pengeluaran + Pai)
+    // Kartu grafik (default: Pengeluaran + Diagram pie)
     let chartType = "expense", chartStyle = "pie";
     const chartCard = u.el("section", { class: "card" });
     container.appendChild(chartCard);
@@ -222,7 +222,7 @@ KK.summary = (function () {
       ]));
       chartCard.appendChild(u.el("div", { class: "chart-controls" }, [
         segmented([{ value: "expense", label: "Pengeluaran" }, { value: "income", label: "Pemasukan" }], chartType, (v) => { chartType = v; renderChartCard(); }),
-        segmented([{ value: "bar", label: "Batang" }, { value: "pie", label: "Pai" }], chartStyle, (v) => { chartStyle = v; renderChartCard(); }),
+        segmented([{ value: "bar", label: "Diagram batang" }, { value: "pie", label: "Diagram pie" }], chartStyle, (v) => { chartStyle = v; renderChartCard(); }),
       ]));
       const body = u.el("div", {});
       chartCard.appendChild(body);
