@@ -11,13 +11,27 @@
 -- ============================================================================
 
 -- 1) Longgarkan CHECK type pada categories & transactions.
-alter table public.categories  drop constraint if exists categories_type_check;
-alter table public.categories  add  constraint categories_type_check
-  check (type in ('income', 'expense', 'investment'));
+--    Anti-gagal: hapus constraint "type" lama APA PUN NAMANYA (termasuk versi
+--    yang mungkin sudah dibuat ulang), lalu pasang yang baru. Aman diulang.
+do $$
+declare c record;
+begin
+  for c in
+    select conrelid::regclass as tbl, conname
+    from pg_constraint
+    where contype = 'c'
+      and conrelid in ('public.categories'::regclass, 'public.transactions'::regclass)
+      and pg_get_constraintdef(oid) ~* 'type'
+      and pg_get_constraintdef(oid) ~* 'income'
+  loop
+    execute format('alter table %s drop constraint %I', c.tbl, c.conname);
+  end loop;
+end $$;
 
-alter table public.transactions drop constraint if exists transactions_type_check;
-alter table public.transactions add  constraint transactions_type_check
-  check (type in ('income', 'expense', 'investment'));
+alter table public.categories
+  add constraint categories_type_check check (type in ('income', 'expense', 'investment'));
+alter table public.transactions
+  add constraint transactions_type_check check (type in ('income', 'expense', 'investment'));
 
 -- 2) Seed default per-user kini termasuk kategori "Investasi".
 create or replace function public.seed_default_categories(p_family_id uuid)
