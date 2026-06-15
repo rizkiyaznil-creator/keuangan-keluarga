@@ -376,26 +376,30 @@ KK.app = (function () {
     try {
       state.categories = await KK.db.listCategories();
       u.clear(main);
-      main.appendChild(pageTitle("Kelola Kategori", "Kategori keluarga"));
+      const mine = (c) => c.user_id === (state.user && state.user.id);
+      main.appendChild(pageTitle("Kelola Kategori", isAdmin() ? "Punyamu + semua anggota" : "Kategori milikmu"));
       const addBtn = u.el("button", { class: "btn btn-primary", text: "+ Tambah Kategori" });
       addBtn.addEventListener("click", () => openCategoryModal(null));
       main.appendChild(u.el("div", { class: "actions-row" }, [addBtn]));
 
       ["expense", "income"].forEach((type) => {
-        const list = state.categories.filter((c) => c.type === type);
+        const list = state.categories.filter((c) => c.type === type)
+          .sort((a, b) => ((mine(a) ? 0 : 1) - (mine(b) ? 0 : 1)) || a.name.localeCompare(b.name));
         const sec = u.el("section", { class: "card" }, [
           u.el("h3", { class: "card-title", text: type === "expense" ? "Pengeluaran" : "Pemasukan" }),
         ]);
         if (!list.length) sec.appendChild(u.el("p", { class: "muted", text: "Belum ada kategori." }));
         list.forEach((c) => {
+          const own = mine(c);
+          const tags = [];
+          if (c.is_default) tags.push(u.el("span", { class: "tag", text: "default" }));
+          if (!own) tags.push(u.el("span", { class: "tag tag-owner", text: state.memberMap[c.user_id] || "anggota" }));
           sec.appendChild(u.el("div", { class: "cat-row" }, [
-            u.el("span", { class: "cat-name" }, [
-              c.name, c.is_default ? u.el("span", { class: "tag", text: "default" }) : null,
-            ]),
-            u.el("div", { class: "cat-actions" }, [
+            u.el("span", { class: "cat-name" }, [c.name].concat(tags)),
+            own ? u.el("div", { class: "cat-actions" }, [
               iconBtn("Edit", () => openCategoryModal(c)),
               iconBtn("Hapus", () => removeCategory(c), "danger"),
-            ]),
+            ]) : u.el("span", { class: "cat-readonly muted", text: "milik anggota" }),
           ]));
         });
         main.appendChild(sec);
@@ -460,13 +464,13 @@ KK.app = (function () {
     let curType = opts.type === "income" ? "income" : "expense";
     const sel = u.el("select", { class: "input" });
     const addBtn = u.el("button", { class: "btn btn-ghost btn-sm cat-add-btn", type: "button", text: "＋", title: "Tambah kategori" });
-    const row = u.el("div", { class: "cat-row" }, [sel, addBtn]);
+    const row = u.el("div", { class: "cat-pick" }, [sel, addBtn]);
 
     function fill(selectedId) {
       const keep = selectedId != null ? selectedId : sel.value;
       u.clear(sel);
       sel.appendChild(u.el("option", { value: "", text: "— Tanpa kategori —" }));
-      (state.categories || []).filter((c) => c.type === curType).forEach((c) =>
+      (state.categories || []).filter((c) => c.type === curType && c.user_id === (state.user && state.user.id)).forEach((c) =>
         sel.appendChild(u.el("option", { value: c.id, text: c.name })));
       if (keep) sel.value = keep;
     }
@@ -497,7 +501,7 @@ KK.app = (function () {
             if (!nm) return u.toast("Nama kategori wajib diisi.", "warn");
             try {
               const existing = (state.categories || []).find(
-                (c) => c.type === type && (c.name || "").trim().toLowerCase() === nm.toLowerCase());
+                (c) => c.user_id === (state.user && state.user.id) && c.type === type && (c.name || "").trim().toLowerCase() === nm.toLowerCase());
               let cat;
               if (existing) {
                 cat = existing;

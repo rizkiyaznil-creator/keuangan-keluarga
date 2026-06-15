@@ -30,15 +30,17 @@ KK.ai = (function () {
   }
 
   function categoriesPayload() {
-    return (KK.app.state.categories || []).map((c) => ({ name: c.name, type: c.type }));
+    const uid = KK.app.state.user && KK.app.state.user.id;
+    return (KK.app.state.categories || []).filter((c) => c.user_id === uid).map((c) => ({ name: c.name, type: c.type }));
   }
 
   // Petakan nama kategori (dari AI) -> id kategori keluarga, cocok per jenis.
   function findCategoryId(name, type) {
     if (!name) return "";
+    const uid = KK.app.state.user && KK.app.state.user.id;
     const lc = String(name).trim().toLowerCase();
     const hit = (KK.app.state.categories || []).find(
-      (c) => c.type === type && c.name.trim().toLowerCase() === lc
+      (c) => c.user_id === uid && c.type === type && c.name.trim().toLowerCase() === lc
     );
     return hit ? hit.id : "";
   }

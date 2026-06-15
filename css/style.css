@@ -60,8 +60,8 @@ a { color: var(--teal-700); }
 .form { display: flex; flex-direction: column; gap: .85rem; }
 .field { display: flex; flex-direction: column; gap: .3rem; }
 .field-label { font-size: .82rem; font-weight: 600; color: var(--muted); }
-.cat-row { display: flex; gap: .4rem; align-items: stretch; }
-.cat-row select { flex: 1; min-width: 0; }
+.cat-pick { display: flex; gap: .4rem; align-items: stretch; }
+.cat-pick select { flex: 1; min-width: 0; }
 .cat-add-btn { flex: 0 0 auto; padding: 0 .8rem; font-size: 1.1rem; line-height: 1; }
 .input {
   font: inherit; font-size: 16px; /* cegah zoom di iOS */
@@ -248,6 +248,8 @@ code { background: #e2e8f0; padding: .1rem .35rem; border-radius: 6px; font-size
 .cat-name { font-weight: 600; display: flex; align-items: center; gap: .5rem; }
 .tag { font-size: .65rem; font-weight: 700; text-transform: uppercase; background: #e2e8f0; color: #475569; padding: .1rem .4rem; border-radius: 6px; }
 .cat-actions { display: flex; gap: .35rem; }
+.tag-owner { background: var(--teal-50); color: var(--teal-700); }
+.cat-readonly { font-size: .78rem; white-space: nowrap; }
 
 /* Keluarga */
 .invite-card { background: linear-gradient(135deg, var(--teal-700), var(--teal-500)); color: #fff; }

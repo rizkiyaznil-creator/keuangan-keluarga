@@ -96,7 +96,7 @@ KK.db = (function () {
   async function listCategories() {
     return unwrap(
       await sb().from("categories")
-        .select("id, family_id, name, type, is_default")
+        .select("id, family_id, user_id, name, type, is_default")
         .order("type", { ascending: true })
         .order("name", { ascending: true })
     ) || [];
@@ -104,7 +104,7 @@ KK.db = (function () {
   async function addCategory(fields) {
     return unwrap(
       await sb().from("categories")
-        .insert({ family_id: ctx.familyId, name: fields.name, type: fields.type, is_default: false })
+        .insert({ family_id: ctx.familyId, user_id: ctx.userId, name: fields.name, type: fields.type, is_default: false })
         .select().single()
     );
   }
