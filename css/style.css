@@ -361,6 +361,16 @@ body.modal-open { overflow: hidden; }
 .price-hist-store { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .price-hist-price { font-weight: 600; }
 
+/* ----------------------- Saran AI (hibrida) ---------------------------- */
+.ai-advice { margin-top: .75rem; }
+.ai-advice-head { display: flex; align-items: flex-start; justify-content: space-between; gap: .75rem; }
+.ai-advice-head .card-title { margin: 0; }
+.ai-advice-head p { margin: .15rem 0 0; }
+.ai-advice-head .btn { flex-shrink: 0; }
+.ai-advice-out { margin-top: .6rem; }
+.ai-advice-lead { margin: 0 0 .5rem; font-weight: 600; }
+.ai-advice-foot { display: flex; align-items: center; justify-content: space-between; gap: .75rem; margin-top: .6rem; }
+
 /* ------------------------------ Input AI ------------------------------- */
 /* Lembar pilihan saat menekan "Tambah" */
 .ai-opts { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; }

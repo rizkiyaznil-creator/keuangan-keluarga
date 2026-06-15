@@ -9,6 +9,8 @@
 //    - "text"  (Ketik cepat) -> DeepSeek bila DEEPSEEK_API_KEY diset (murah,
 //                               kuota terpisah). Jika belum diset -> Gemini.
 //    - "receipt" / "voice"   -> Gemini (perlu input gambar/audio native).
+//    - "advice" (Saran AI)   -> DeepSeek bila ada (teks), selain itu Gemini.
+//                               Input hanya RINGKASAN ANGKA agregat (tanpa data pribadi).
 //
 //  Kenapa lewat Edge Function (bukan langsung dari browser)?
 //    - API key DISIMPAN sebagai secret di server (tidak bocor ke publik).
@@ -64,7 +66,7 @@ Deno.serve(async (req: Request) => {
       ? payload.today
       : new Date().toISOString().slice(0, 10);
 
-    if (!["receipt", "text", "voice"].includes(mode)) {
+    if (!["receipt", "text", "voice", "advice"].includes(mode)) {
       return json({ ok: false, error: "Mode tidak dikenali." }, 400);
     }
 
@@ -72,12 +74,17 @@ Deno.serve(async (req: Request) => {
 
     // --- Routing penyedia: teks -> DeepSeek (bila ada key), selain itu -> Gemini. ---
     const deepseekKey = Deno.env.get("DEEPSEEK_API_KEY");
-    const useDeepseek = mode === "text" && !!deepseekKey;
+    const useDeepseek = (mode === "text" || mode === "advice") && !!deepseekKey;
 
     let resultText: string;
     if (useDeepseek) {
-      const userText = (payload.text || "").toString().trim();
-      if (!userText) return json({ ok: false, error: "Teks kosong." }, 400);
+      if (mode === "advice" && (!payload.summary || typeof payload.summary !== "object")) {
+        return json({ ok: false, error: "Ringkasan angka kosong." }, 400);
+      }
+      const userText = mode === "advice"
+        ? "DATA RINGKASAN (JSON):\n" + JSON.stringify(payload.summary || {})
+        : (payload.text || "").toString().trim();
+      if (mode !== "advice" && !userText) return json({ ok: false, error: "Teks kosong." }, 400);
       const r = await callDeepSeek(deepseekKey!, prompt, userText);
       if (!r.ok) return json({ ok: false, error: r.error, detail: r.detail }, 502);
       resultText = r.text!;
@@ -95,6 +102,11 @@ Deno.serve(async (req: Request) => {
       } else if (mode === "voice") {
         if (!payload.audio) return json({ ok: false, error: "Rekaman suara kosong." }, 400);
         parts.push({ inline_data: { mime_type: payload.audioMime || "audio/wav", data: payload.audio } });
+      } else if (mode === "advice") {
+        if (!payload.summary || typeof payload.summary !== "object") {
+          return json({ ok: false, error: "Ringkasan angka kosong." }, 400);
+        }
+        parts.push({ text: "\n\nDATA RINGKASAN (JSON):\n" + JSON.stringify(payload.summary) });
       } else {
         const text = (payload.text || "").toString().trim();
         if (!text) return json({ ok: false, error: "Teks kosong." }, 400);
@@ -204,6 +216,34 @@ function buildPrompt(
   categories: Array<{ name: string; type: string }>,
   today: string,
 ): string {
+  if (mode === "advice") {
+    return [
+      "Anda penasihat keuangan keluarga Indonesia yang hati-hati, membumi, dan suportif.",
+      "Anda menerima RINGKASAN ANGKA keuangan satu bulan dalam JSON (bukan transaksi mentah, tanpa nama orang).",
+      "Arti field: bulan (YYYY-MM); lingkup ('Saya' atau 'Keluarga'); pemasukan; pengeluaran; " +
+        "saldo (=pemasukan-pengeluaran, negatif berarti defisit); tabungan (nominal pada kategori 'Tabungan'); " +
+        "rasio_tabungan_persen; rasio_pengeluaran_persen; kategori_pengeluaran (daftar {nama, jumlah}, terbesar dahulu); " +
+        "pengeluaran_bulan_lalu (boleh null).",
+      "ATURAN:",
+      "- Gunakan HANYA angka yang diberikan. DILARANG mengarang nominal atau persen yang tidak ada di data.",
+      "- Semua uang dalam Rupiah; tulis dengan pemisah ribuan titik (contoh: Rp 1.500.000).",
+      "- Bahasa Indonesia, ramah, ringkas, konkret, tidak menggurui.",
+      "- Saran harus bisa ditindaklanjuti dan masuk akal untuk keluarga Indonesia.",
+      "- JANGAN merekomendasikan produk investasi spesifik atau menjanjikan imbal hasil. " +
+        "Ini edukasi umum, bukan nasihat keuangan profesional.",
+      "- Jika kategori 'Lainnya' atau 'Tanpa kategori' besar, ingatkan kemungkinan pencatatan belum terkategorisasi rapi.",
+      "- Jika tabungan 0 padahal ada pemasukan, ingatkan tabungan mungkin tercatat di kategori lain.",
+      "Keluarkan HANYA JSON valid berbentuk persis:",
+      "{",
+      '  "ringkasan": string,',
+      '  "items": [',
+      '    { "level": "good"|"warn"|"danger"|"info", "title": string, "text": string }',
+      "  ]",
+      "}",
+      "Beri 3 sampai 5 item, urut dari paling penting. 'title' singkat (maks ~6 kata); 'text' maks 2 kalimat.",
+    ].join("\n");
+  }
+
   const exp = categories.filter((c) => c.type === "expense").map((c) => c.name);
   const inc = categories.filter((c) => c.type === "income").map((c) => c.name);
   const catBlock =

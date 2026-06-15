@@ -113,21 +113,89 @@ KK.advice = (function () {
     return { items, totals: t };
   }
 
-  function render(container, thisTxs, lastTxs) {
-    u.clear(container);
-    const { items } = compute(thisTxs, lastTxs);
+  function iconForLevel(level) {
+    return level === "good" ? "✅" : level === "warn" ? "⚠️" : level === "danger" ? "🚨" : "💡";
+  }
+
+  // Render daftar item saran (dipakai saran rule-based maupun saran AI).
+  function renderItems(container, items) {
     const list = u.el("div", { class: "advice-list" });
-    items.forEach((it) => {
-      list.appendChild(u.el("div", { class: "advice-item advice-" + it.level }, [
-        u.el("div", { class: "advice-icon", text: it.icon }),
+    (items || []).forEach((it) => {
+      list.appendChild(u.el("div", { class: "advice-item advice-" + (it.level || "info") }, [
+        u.el("div", { class: "advice-icon", text: it.icon || iconForLevel(it.level) }),
         u.el("div", { class: "advice-body" }, [
-          u.el("div", { class: "advice-title", text: it.title }),
-          u.el("div", { class: "advice-text", text: it.text }),
+          u.el("div", { class: "advice-title", text: it.title || "" }),
+          u.el("div", { class: "advice-text", text: it.text || "" }),
         ]),
       ]));
     });
     container.appendChild(list);
   }
 
-  return { compute, render };
+  function render(container, thisTxs, lastTxs) {
+    u.clear(container);
+    const { items } = compute(thisTxs, lastTxs);
+    renderItems(container, items);
+  }
+
+  // Ringkasan ANGKA agregat untuk dikirim ke AI.
+  // Privasi: tanpa nama anggota, tanpa catatan, tanpa transaksi per-baris.
+  function buildSummary(thisTxs, lastTxs, meta) {
+    meta = meta || {};
+    const t = totals(thisTxs || []);
+    const p = totals(lastTxs || []);
+    const catMap = new Map();
+    (thisTxs || []).forEach((x) => {
+      if (x.type === "income") return;
+      const name = x.category_name || "Tanpa kategori";
+      catMap.set(name, (catMap.get(name) || 0) + x.amount);
+    });
+    const r = (n) => Math.round(n);
+    const kategori = Array.from(catMap, (e) => ({ nama: e[0], jumlah: r(e[1]) }))
+      .sort((a, b) => b.jumlah - a.jumlah).slice(0, 8);
+    return {
+      bulan: meta.bulan || "",
+      lingkup: meta.lingkup || "Saya",
+      mata_uang: "IDR",
+      pemasukan: r(t.income),
+      pengeluaran: r(t.expense),
+      saldo: r(t.balance),
+      tabungan: r(t.savings),
+      rasio_tabungan_persen: t.income > 0 ? Math.round((t.savings / t.income) * 100) : null,
+      rasio_pengeluaran_persen: t.income > 0 ? Math.round((t.expense / t.income) * 100) : null,
+      kategori_pengeluaran: kategori,
+      pengeluaran_bulan_lalu: (lastTxs && lastTxs.length) ? r(p.expense) : null,
+    };
+  }
+
+  // Panggil Edge Function "ai-parse" mode advice. Mengembalikan {ringkasan, items}.
+  async function aiAdvice(summary) {
+    if (!KK.sb) throw new Error("Aplikasi belum terhubung ke Supabase.");
+    const { data, error } = await KK.sb.functions.invoke("ai-parse", { body: { mode: "advice", summary: summary } });
+    if (error) {
+      let msg = (error && error.message) || "Gagal memanggil layanan AI.";
+      let gotBody = false;
+      try {
+        if (error.context && typeof error.context.json === "function") {
+          const body = await error.context.json();
+          if (body && body.error) { msg = body.error; gotBody = true; }
+        }
+      } catch (_) { /* abaikan */ }
+      if (!gotBody && /Failed to fetch|NetworkError|load failed|not found|404/i.test(msg)) {
+        msg = "Fitur AI belum aktif atau tidak ada koneksi. Pastikan Edge Function \"ai-parse\" sudah dipasang.";
+      }
+      throw new Error(msg);
+    }
+    if (!data || data.ok === false) throw new Error((data && data.error) || "AI gagal menyusun saran.");
+    const res = data.result || {};
+    const items = Array.isArray(res.items)
+      ? res.items.filter((x) => x && x.title && x.text).map((x) => ({
+          level: ["good", "warn", "danger", "info"].indexOf(x.level) >= 0 ? x.level : "info",
+          title: String(x.title), text: String(x.text),
+        }))
+      : [];
+    return { ringkasan: typeof res.ringkasan === "string" ? res.ringkasan : "", items: items };
+  }
+
+  return { compute, render, renderItems, buildSummary, aiAdvice };
 })();

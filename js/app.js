@@ -262,6 +262,7 @@ KK.app = (function () {
         const card = u.el("div", { class: "card" });
         body.appendChild(card);
         KK.advice.render(card, thisTxs, lastTxs);
+        renderAiAdviceSection(body, thisTxs, lastTxs);
       } catch (err) { errorBox(body, err); }
     } else {
       await KK.price.render(body, isAdmin() ? state.scope : "self");
@@ -280,6 +281,93 @@ KK.app = (function () {
     return u.el("div", { class: "controls" }, [
       u.el("div", { class: "control" }, [u.el("span", { class: "control-label", text: "Lingkup" }), seg]),
     ]);
+  }
+
+  // ---- Saran AI (hibrida): tombol on-demand + cache per bulan & lingkup -------
+  const aiAdviceCache = loadAiAdviceCache();
+  function loadAiAdviceCache() {
+    try { return JSON.parse(localStorage.getItem("kk_ai_advice") || "{}") || {}; }
+    catch (_) { return {}; }
+  }
+  function saveAiAdviceCache() {
+    try {
+      const keys = Object.keys(aiAdviceCache);
+      if (keys.length > 8) keys.slice(0, keys.length - 8).forEach((k) => delete aiAdviceCache[k]);
+      localStorage.setItem("kk_ai_advice", JSON.stringify(aiAdviceCache));
+    } catch (_) { /* storage penuh / mode privat: abaikan */ }
+  }
+
+  function renderAiAdviceSection(host, thisTxs, lastTxs) {
+    const lingkup = isAdmin() ? (state.scope === "family" ? "Keluarga" : "Saya") : "Saya";
+    const summary = KK.advice.buildSummary(thisTxs, lastTxs, { bulan: state.month, lingkup: lingkup });
+    const key = summary.bulan + "|" + summary.lingkup;
+    const hash = JSON.stringify(summary);
+
+    const wrap = u.el("div", { class: "card ai-advice" });
+    host.appendChild(wrap);
+
+    const btn = u.el("button", { class: "btn btn-primary btn-sm", type: "button", text: "Minta saran AI" });
+    wrap.appendChild(u.el("div", { class: "ai-advice-head" }, [
+      u.el("div", {}, [
+        u.el("h3", { class: "card-title", text: "✨ Saran AI" }),
+        u.el("p", { class: "small muted", text: "Hanya ringkasan angka (tanpa nama/rincian) yang dikirim ke AI." }),
+      ]),
+      btn,
+    ]));
+
+    const out = u.el("div", { class: "ai-advice-out" });
+    wrap.appendChild(out);
+
+    function cachedResult() {
+      const c = aiAdviceCache[key];
+      return (c && c.hash === hash) ? c.result : null;
+    }
+
+    function paint(result, fromCache) {
+      u.clear(out);
+      if (result.ringkasan) out.appendChild(u.el("p", { class: "ai-advice-lead", text: result.ringkasan }));
+      KK.advice.renderItems(out, result.items);
+      const again = u.el("button", { class: "btn btn-ghost btn-sm", type: "button", text: "↻ Perbarui" });
+      again.addEventListener("click", () => run(true));
+      out.appendChild(u.el("div", { class: "ai-advice-foot" }, [
+        u.el("span", { class: "small muted", text: fromCache
+          ? "Tersimpan dari permintaan sebelumnya."
+          : "Disusun AI dari ringkasan angkamu — tetap periksa sebelum dijadikan keputusan." }),
+        again,
+      ]));
+      btn.classList.add("hidden");
+    }
+
+    async function run(force) {
+      if (!force) { const c = cachedResult(); if (c) { paint(c, true); return; } }
+      btn.disabled = true; btn.textContent = "Menyusun…";
+      u.clear(out);
+      out.appendChild(u.el("div", { class: "loading", text: "AI sedang menganalisis…" }));
+      try {
+        const result = await KK.advice.aiAdvice(summary);
+        if (!result.items.length) {
+          u.clear(out);
+          out.appendChild(u.el("p", { class: "muted", text: "AI tidak mengembalikan saran. Coba lagi nanti." }));
+          btn.disabled = false; btn.textContent = "Coba lagi";
+          return;
+        }
+        aiAdviceCache[key] = { hash: hash, result: result };
+        saveAiAdviceCache();
+        paint(result, false);
+      } catch (err) {
+        u.clear(out);
+        out.appendChild(u.el("div", { class: "error-box" }, [
+          u.el("p", { text: "Gagal membuat saran AI: " + KK.auth.friendly(err) }),
+          u.el("p", { class: "small muted", text: "Saran otomatis di atas tetap bisa dipakai." }),
+        ]));
+        btn.disabled = false; btn.textContent = "Coba lagi";
+      }
+    }
+
+    btn.addEventListener("click", () => run(false));
+
+    const existing = cachedResult();
+    if (existing) paint(existing, true);
   }
 
   // ------------------------------------------------------------------- KATEGORI
