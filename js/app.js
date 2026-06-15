@@ -453,6 +453,69 @@ KK.app = (function () {
   }
 
   // -------------------------------------------------------------- TRANSAKSI (modal)
+  // Pemilih kategori: <select> + tombol "＋" untuk menambah kategori cepat
+  // (jenis mengikuti transaksi). Dipakai form manual & form review AI (ai.js).
+  function makeCategoryPicker(opts) {
+    opts = opts || {};
+    let curType = opts.type === "income" ? "income" : "expense";
+    const sel = u.el("select", { class: "input" });
+    const addBtn = u.el("button", { class: "btn btn-ghost btn-sm cat-add-btn", type: "button", text: "＋", title: "Tambah kategori" });
+    const row = u.el("div", { class: "cat-row" }, [sel, addBtn]);
+
+    function fill(selectedId) {
+      const keep = selectedId != null ? selectedId : sel.value;
+      u.clear(sel);
+      sel.appendChild(u.el("option", { value: "", text: "— Tanpa kategori —" }));
+      (state.categories || []).filter((c) => c.type === curType).forEach((c) =>
+        sel.appendChild(u.el("option", { value: c.id, text: c.name })));
+      if (keep) sel.value = keep;
+    }
+    fill(opts.selectedId);
+
+    addBtn.addEventListener("click", () => addCategoryFlow(curType, (cat) => fill(cat.id)));
+
+    return {
+      row: row,
+      getValue: () => sel.value || null,
+      setType: (t) => { curType = t === "income" ? "income" : "expense"; fill(""); },
+    };
+  }
+
+  // Modal kecil "Tambah Kategori" (jenis terkunci ke transaksi). Anti-duplikat.
+  function addCategoryFlow(type, onCreated) {
+    const f = u.el("form", { class: "form" });
+    const nameInp = u.el("input", { class: "input", type: "text",
+      placeholder: "Nama kategori " + (type === "income" ? "pemasukan" : "pengeluaran") });
+    f.appendChild(field("Nama kategori", nameInp));
+    u.openModal({
+      title: "Tambah Kategori",
+      body: f,
+      actions: [
+        { label: "Batal", class: "btn-ghost", onClick: (c) => c() },
+        { label: "Tambah", class: "btn-primary", onClick: async (close) => {
+            const nm = nameInp.value.trim();
+            if (!nm) return u.toast("Nama kategori wajib diisi.", "warn");
+            try {
+              const existing = (state.categories || []).find(
+                (c) => c.type === type && (c.name || "").trim().toLowerCase() === nm.toLowerCase());
+              let cat;
+              if (existing) {
+                cat = existing;
+                u.toast("Kategori \"" + existing.name + "\" sudah ada — dipakai.", "success");
+              } else {
+                cat = await KK.db.addCategory({ name: nm, type: type });
+                state.categories = await KK.db.listCategories();
+                u.toast("Kategori \"" + nm + "\" ditambahkan.", "success");
+              }
+              close();
+              if (onCreated) onCreated(cat);
+            } catch (err) { u.toast(KK.auth.friendly(err), "error"); }
+          } },
+      ],
+    });
+    setTimeout(() => nameInp.focus(), 50);
+  }
+
   function openTxModal(tx) {
     const editing = !!tx;
     const form = u.el("form", { class: "form" });
@@ -465,7 +528,7 @@ KK.app = (function () {
         curType = val;
         u.$$(".seg", typeSeg).forEach((x) => x.classList.remove("active"));
         b.classList.add("active");
-        fillCategories();
+        catPicker.setType(curType);
       });
       return b;
     };
@@ -478,16 +541,11 @@ KK.app = (function () {
     u.attachThousandsInput(amount);
     form.appendChild(field("Jumlah (Rp)", amount));
 
-    const catSel = u.el("select", { class: "input" });
-    form.appendChild(field("Kategori", catSel));
-    function fillCategories() {
-      u.clear(catSel);
-      catSel.appendChild(u.el("option", { value: "", text: "— Tanpa kategori —" }));
-      state.categories.filter((c) => c.type === curType).forEach((c) =>
-        catSel.appendChild(u.el("option", { value: c.id, text: c.name })));
-      if (editing && tx.category_id) catSel.value = tx.category_id;
-    }
-    fillCategories();
+    const catPicker = makeCategoryPicker({ type: curType, selectedId: editing ? tx.category_id : "" });
+    form.appendChild(u.el("div", { class: "field" }, [
+      u.el("span", { class: "field-label", text: "Kategori" }),
+      catPicker.row,
+    ]));
 
     const date = u.el("input", { class: "input", type: "date", value: editing ? tx.tx_date : u.todayISO() });
     form.appendChild(field("Tanggal", date));
@@ -506,7 +564,7 @@ KK.app = (function () {
         const amt = u.parseNumber(amount.value);
         if (amt <= 0) return u.toast("Jumlah harus lebih dari 0.", "warn");
         if (!date.value) return u.toast("Tanggal wajib diisi.", "warn");
-        const payload = { type: curType, amount: amt, category_id: catSel.value || null, tx_date: date.value, note: note.value.trim() };
+        const payload = { type: curType, amount: amt, category_id: catPicker.getValue(), tx_date: date.value, note: note.value.trim() };
         try {
           if (editing) await KK.db.updateTransaction(tx.id, payload);
           else await KK.db.addTransaction(payload);
@@ -751,6 +809,7 @@ KK.app = (function () {
     init, state,
     openManualTx: () => openTxModal(null),
     refreshAfterAdd,
+    makeCategoryPicker,
   };
 })();
 

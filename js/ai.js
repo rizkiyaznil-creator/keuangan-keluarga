@@ -403,15 +403,6 @@ KK.ai = (function () {
     return inp;
   }
 
-  function categorySelect(type, selectedId) {
-    const sel = u.el("select", { class: "input" });
-    sel.appendChild(u.el("option", { value: "", text: "— Tanpa kategori —" }));
-    (KK.app.state.categories || []).filter((c) => c.type === type).forEach((c) =>
-      sel.appendChild(u.el("option", { value: c.id, text: c.name })));
-    if (selectedId) sel.value = selectedId;
-    return sel;
-  }
-
   async function saveDrafts(drafts, m, btn) {
     if (!drafts.length) { u.toast("Tidak ada transaksi untuk disimpan.", "warn"); return; }
     u.setLoading(btn, true, "Menyimpan…");
@@ -462,7 +453,7 @@ KK.ai = (function () {
       item = item || {};
       const nameInp = u.el("input", { class: "input", type: "text", value: item.name || "", placeholder: "Nama barang" });
       const amt = amountInput(item.amount);
-      const cat = categorySelect("expense", findCategoryId(item.category, "expense"));
+      const cat = KK.app.makeCategoryPicker({ type: "expense", selectedId: findCategoryId(item.category, "expense") });
       amt.addEventListener("input", recompute);
 
       const sub = [];
@@ -475,7 +466,7 @@ KK.ai = (function () {
         removeBtn,
         u.el("div", { class: "ai-item-grid" }, [
           nameInp,
-          u.el("div", { class: "ai-row2" }, [amt, cat]),
+          u.el("div", { class: "ai-row2" }, [amt, cat.row]),
           sub.length ? u.el("div", { class: "ai-item-sub", text: sub.join("  ") }) : null,
         ]),
       ]);
@@ -510,7 +501,7 @@ KK.ai = (function () {
         const name = r.name.value.trim();
         if (amount <= 0) return;
         drafts.push({
-          type: "expense", amount, category_id: r.cat.value || null,
+          type: "expense", amount, category_id: r.cat.getValue(),
           note: name || (store ? "Belanja " + store : "Item belanja"),
           tx_date: date, source: "receipt", store,
           qty: r.qty != null ? r.qty : null,
@@ -561,8 +552,7 @@ KK.ai = (function () {
 
       const typeSeg = u.el("div", { class: "segmented seg-type" });
       const amt = amountInput(tx.amount);
-      let cat = categorySelect(type, findCategoryId(tx.category, type));
-      const catSlot = u.el("div", { class: "ai-cat-slot" }, [cat]);
+      const catPicker = KK.app.makeCategoryPicker({ type: type, selectedId: findCategoryId(tx.category, type) });
 
       const mkType = (val, label) => {
         const b = u.el("button", { type: "button", class: "seg" + (type === val ? " active" : ""), text: label });
@@ -571,9 +561,7 @@ KK.ai = (function () {
           type = val;
           u.$$(".seg", typeSeg).forEach((x) => x.classList.remove("active"));
           b.classList.add("active");
-          const fresh = categorySelect(type, "");
-          catSlot.replaceChild(fresh, cat);
-          cat = fresh;
+          catPicker.setType(type);
         });
         return b;
       };
@@ -583,13 +571,13 @@ KK.ai = (function () {
       const dateInp = u.el("input", { class: "input", type: "date", value: (tx.date && /^\d{4}-\d{2}-\d{2}$/.test(tx.date)) ? tx.date : u.todayISO() });
       const noteInp = u.el("input", { class: "input", type: "text", value: tx.note || "", placeholder: "Catatan" });
 
-      const rowObj = { getType: () => type, amount: amt, getCat: () => cat.value, date: dateInp, note: noteInp, removed: false };
+      const rowObj = { getType: () => type, amount: amt, getCat: () => catPicker.getValue(), date: dateInp, note: noteInp, removed: false };
       const removeBtn = u.el("button", { class: "ai-item-remove", type: "button", title: "Hapus", html: "&times;" });
       const wrap = u.el("div", { class: "ai-item" }, [
         removeBtn,
         u.el("div", { class: "ai-item-grid" }, [
           typeSeg,
-          u.el("div", { class: "ai-row2" }, [amt, catSlot]),
+          u.el("div", { class: "ai-row2" }, [amt, catPicker.row]),
           u.el("div", { class: "ai-row2" }, [dateInp, noteInp]),
         ]),
       ]);

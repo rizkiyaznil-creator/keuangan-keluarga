@@ -60,6 +60,9 @@ a { color: var(--teal-700); }
 .form { display: flex; flex-direction: column; gap: .85rem; }
 .field { display: flex; flex-direction: column; gap: .3rem; }
 .field-label { font-size: .82rem; font-weight: 600; color: var(--muted); }
+.cat-row { display: flex; gap: .4rem; align-items: stretch; }
+.cat-row select { flex: 1; min-width: 0; }
+.cat-add-btn { flex: 0 0 auto; padding: 0 .8rem; font-size: 1.1rem; line-height: 1; }
 .input {
   font: inherit; font-size: 16px; /* cegah zoom di iOS */
   padding: .65rem .75rem; border: 1px solid var(--border-2);
