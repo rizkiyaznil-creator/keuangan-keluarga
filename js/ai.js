@@ -232,6 +232,7 @@ KK.ai = (function () {
       opt("⚡", "Ketik cepat", "cth: “makan 25rb”", () => openTextFlow()),
       opt("📷", "Scan struk", "Foto struk belanja", () => openReceiptFlow()),
       opt("🎤", "Voice note", "Ucapkan transaksi", () => openVoiceFlow()),
+      opt("📋", "Impor mutasi", "Rekening / GoPay / OVO", () => openImportFlow()),
     ]);
     const m = u.openModal({ title: "Tambah Transaksi", body: grid });
   }
@@ -285,6 +286,55 @@ KK.ai = (function () {
           processAndReview(host, m, "Menganalisis teks…",
             async () => ({ mode: "text", text, categories: categoriesPayload(), today: u.todayISO() }),
             (h, mm, result) => renderDraftsReview(h, mm, result, { source: "text" }));
+        },
+      }),
+    ]));
+    setTimeout(() => ta.focus(), 60);
+  }
+
+  // ------------------------------------------------------------- IMPOR MUTASI
+  function openImportFlow() {
+    const m = u.openModal({ title: "📋 Impor Mutasi" });
+    renderImportInput(m.body, m);
+  }
+
+  function renderImportInput(host, m) {
+    u.clear(host);
+    const ta = u.el("textarea", {
+      class: "input ai-textarea", rows: "5",
+      placeholder: "Tempel mutasi rekening / riwayat GoPay/OVO di sini…",
+    });
+    const fileInp = u.el("input", { type: "file", accept: "image/*", class: "hidden" });
+    const pickBtn = u.el("button", { class: "btn btn-ghost btn-sm", type: "button", text: "🖼️ Unggah screenshot" });
+    pickBtn.addEventListener("click", () => fileInp.click());
+    fileInp.addEventListener("change", () => {
+      const file = fileInp.files && fileInp.files[0];
+      if (!file) return;
+      processAndReview(host, m, "Membaca mutasi…",
+        async () => {
+          const img = await downscaleImage(file, 1400, 0.72);
+          return { mode: "import", image: img.data, imageMime: img.mime, categories: categoriesPayload(), today: u.todayISO() };
+        },
+        (h, mm, result) => renderDraftsReview(h, mm, result, { source: "import", allowTransfer: true }));
+    });
+
+    host.appendChild(u.el("div", { class: "form" }, [
+      u.el("label", { class: "field" }, [
+        u.el("span", { class: "field-label", text: "Tempel teks mutasi / riwayat e-wallet" }), ta,
+      ]),
+      u.el("p", { class: "hint", text: "Atau unggah screenshot riwayat transaksi. Top-up / transfer antar-dompet otomatis ditandai & diabaikan." }),
+      pickBtn, fileInp,
+    ]));
+    host.appendChild(u.el("div", { class: "ai-foot" }, [
+      u.el("button", { class: "btn btn-ghost", text: "Batal", onClick: () => m.close() }),
+      u.el("button", {
+        class: "btn btn-primary", text: "Proses",
+        onClick: () => {
+          const text = ta.value.trim();
+          if (!text) return u.toast("Tempel teks mutasi, atau unggah screenshot.", "warn");
+          processAndReview(host, m, "Membaca mutasi…",
+            async () => ({ mode: "import", text, categories: categoriesPayload(), today: u.todayISO() }),
+            (h, mm, result) => renderDraftsReview(h, mm, result, { source: "import", allowTransfer: true }));
         },
       }),
     ]));
@@ -544,11 +594,16 @@ KK.ai = (function () {
     host.appendChild(listEl);
 
     const rows = [];
-    function recount() { u.$(".ai-count", host).textContent = rows.filter((r) => !r.removed).length + " transaksi"; }
+    function recount() {
+      const keep = rows.filter((r) => !r.removed && !r.isTransfer());
+      const ignored = rows.filter((r) => !r.removed && r.isTransfer());
+      u.$(".ai-count", host).textContent = keep.length + " transaksi" + (ignored.length ? " · " + ignored.length + " transfer diabaikan" : "");
+    }
 
     function addTxRow(tx) {
       tx = tx || {};
       let type = tx.tx_type === "income" ? "income" : "expense";
+      let isTransfer = !!(opts.allowTransfer && tx.transfer);
 
       const typeSeg = u.el("div", { class: "segmented seg-type" });
       const amt = amountInput(tx.amount);
@@ -571,16 +626,35 @@ KK.ai = (function () {
       const dateInp = u.el("input", { class: "input", type: "date", value: (tx.date && /^\d{4}-\d{2}-\d{2}$/.test(tx.date)) ? tx.date : u.todayISO() });
       const noteInp = u.el("input", { class: "input", type: "text", value: tx.note || "", placeholder: "Catatan" });
 
-      const rowObj = { getType: () => type, amount: amt, getCat: () => catPicker.getValue(), date: dateInp, note: noteInp, removed: false };
+      const rowObj = { getType: () => type, amount: amt, getCat: () => catPicker.getValue(), date: dateInp, note: noteInp, removed: false, isTransfer: () => isTransfer };
       const removeBtn = u.el("button", { class: "ai-item-remove", type: "button", title: "Hapus", html: "&times;" });
+
+      const grid = [
+        typeSeg,
+        u.el("div", { class: "ai-row2" }, [amt, catPicker.row]),
+        u.el("div", { class: "ai-row2" }, [dateInp, noteInp]),
+      ];
+      let transferCb = null;
+      if (opts.allowTransfer) {
+        transferCb = u.el("input", { type: "checkbox" });
+        transferCb.checked = isTransfer;
+        grid.push(u.el("label", { class: "ai-transfer" }, [
+          transferCb, u.el("span", { text: "Transfer / top-up — abaikan (jangan dihitung)" }),
+        ]));
+      }
+
       const wrap = u.el("div", { class: "ai-item" }, [
         removeBtn,
-        u.el("div", { class: "ai-item-grid" }, [
-          typeSeg,
-          u.el("div", { class: "ai-row2" }, [amt, catPicker.row]),
-          u.el("div", { class: "ai-row2" }, [dateInp, noteInp]),
-        ]),
+        u.el("div", { class: "ai-item-grid" }, grid),
       ]);
+      if (opts.allowTransfer) {
+        wrap.classList.toggle("is-transfer", isTransfer);
+        transferCb.addEventListener("change", () => {
+          isTransfer = transferCb.checked;
+          wrap.classList.toggle("is-transfer", isTransfer);
+          recount();
+        });
+      }
       removeBtn.addEventListener("click", () => { rowObj.removed = true; wrap.remove(); recount(); });
       rows.push(rowObj);
       listEl.appendChild(wrap);
@@ -600,7 +674,7 @@ KK.ai = (function () {
     saveBtn.addEventListener("click", () => {
       const drafts = [];
       rows.forEach((r) => {
-        if (r.removed) return;
+        if (r.removed || r.isTransfer()) return;
         const amount = u.parseNumber(r.amount.value);
         if (amount <= 0) return;
         drafts.push({

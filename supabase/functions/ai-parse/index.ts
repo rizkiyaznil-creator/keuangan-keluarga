@@ -11,6 +11,8 @@
 //    - "receipt" / "voice"   -> Gemini (perlu input gambar/audio native).
 //    - "advice" (Saran AI)   -> DeepSeek DIUTAMAKAN bila ada; fallback otomatis ke Gemini.
 //                               Input hanya RINGKASAN ANGKA agregat (tanpa data pribadi).
+//    - "import" (Impor mutasi) -> teks: DeepSeek (fallback Gemini); gambar: Gemini.
+//                               Output daftar transaksi + flag 'transfer' (top-up/pindah dana).
 //
 //  Kenapa lewat Edge Function (bukan langsung dari browser)?
 //    - API key DISIMPAN sebagai secret di server (tidak bocor ke publik).
@@ -66,7 +68,7 @@ Deno.serve(async (req: Request) => {
       ? payload.today
       : new Date().toISOString().slice(0, 10);
 
-    if (!["receipt", "text", "voice", "advice"].includes(mode)) {
+    if (!["receipt", "text", "voice", "advice", "import"].includes(mode)) {
       return json({ ok: false, error: "Mode tidak dikenali." }, 400);
     }
 
@@ -81,13 +83,16 @@ Deno.serve(async (req: Request) => {
     if (mode === "text" && !(payload.text || "").toString().trim()) {
       return json({ ok: false, error: "Teks kosong." }, 400);
     }
+    if (mode === "import" && !payload.image && !(payload.text || "").toString().trim()) {
+      return json({ ok: false, error: "Mutasi kosong (tempel teks atau unggah screenshot)." }, 400);
+    }
 
     // --- Routing penyedia ---
     //   text/advice : DeepSeek DIUTAMAKAN bila DEEPSEEK_API_KEY ada; bila gagal,
     //                 otomatis fallback ke Gemini. receipt/voice : selalu Gemini.
     const geminiKey = Deno.env.get("GEMINI_API_KEY");
     const deepseekKey = Deno.env.get("DEEPSEEK_API_KEY");
-    const preferDeepseek = (mode === "text" || mode === "advice") && !!deepseekKey;
+    const preferDeepseek = (mode === "text" || mode === "advice" || (mode === "import" && !payload.image)) && !!deepseekKey;
 
     let resultText: string | null = null;
     let provider = "";
@@ -97,6 +102,8 @@ Deno.serve(async (req: Request) => {
     if (preferDeepseek) {
       const userText = mode === "advice"
         ? "DATA RINGKASAN (JSON):\n" + JSON.stringify(payload.summary || {})
+        : mode === "import"
+        ? "DATA MUTASI:\n" + (payload.text || "").toString().trim()
         : (payload.text || "").toString().trim();
       const r = await callDeepSeek(deepseekKey!, prompt, userText);
       if (r.ok) { resultText = r.text!; provider = "deepseek"; }
@@ -114,8 +121,8 @@ Deno.serve(async (req: Request) => {
         }, preferDeepseek ? 502 : 500);
       }
       const parts = buildGeminiParts(mode, payload, prompt);
-      // Struk: sedikit anggaran nalar (256); lainnya matikan demi hemat.
-      const thinkingBudget = mode === "receipt" ? 256 : 0;
+      // Struk & impor-gambar: sedikit anggaran nalar (256); lainnya matikan demi hemat.
+      const thinkingBudget = (mode === "receipt" || (mode === "import" && !!payload.image)) ? 256 : 0;
       const r = await callGemini(geminiKey, parts, thinkingBudget);
       if (!r.ok) {
         const err = preferDeepseek ? ("DeepSeek lalu Gemini sama-sama gagal. " + r.error) : r.error;
@@ -241,6 +248,12 @@ function buildGeminiParts(
     parts.push({ inline_data: { mime_type: payload.audioMime || "audio/wav", data: payload.audio } });
   } else if (mode === "advice") {
     parts.push({ text: "\n\nDATA RINGKASAN (JSON):\n" + JSON.stringify(payload.summary) });
+  } else if (mode === "import") {
+    if (payload.image) {
+      parts.push({ inline_data: { mime_type: payload.imageMime || "image/jpeg", data: payload.image } });
+    } else {
+      parts.push({ text: "\n\nDATA MUTASI:\n" + (payload.text || "").toString().trim() });
+    }
   } else {
     parts.push({ text: '\n\nKalimat pengguna:\n"""\n' + (payload.text || "").toString().trim() + '\n"""' });
   }
@@ -302,6 +315,39 @@ function buildPrompt(
   const catRule =
     "Untuk tiap transaksi/item, pilih kategori dari daftar di atas yang paling cocok " +
     "(SALIN nama persis, perhatikan jenis pengeluaran/pemasukan). Bila ragu atau tidak ada yang cocok, isi null.";
+
+  if (mode === "import") {
+    return [
+      "Anda membaca MUTASI REKENING BANK atau RIWAYAT TRANSAKSI dompet digital (GoPay/OVO/DANA, dsb), " +
+        "dari gambar (screenshot) ATAU teks, lalu mengubahnya menjadi DAFTAR transaksi JSON.",
+      catBlock, moneyRule, dateRule, catRule,
+      "Setiap baris transaksi menjadi satu objek. ABAIKAN baris non-transaksi: saldo awal/akhir, " +
+        "subtotal/total, header kolom, nomor halaman, info pemilik/nomor rekening.",
+      "tx_type: 'expense' untuk dana KELUAR (debet, pembayaran, pembelian, transfer keluar, top-up keluar); " +
+        "'income' untuk dana MASUK (kredit, terima, refund, cashback).",
+      "amount: nominal POSITIF dalam Rupiah bilangan bulat. date: tanggal transaksi (YYYY-MM-DD).",
+      "note: keterangan singkat & rapi (nama merchant/penerima). Buang kode mesin yang tidak berguna.",
+      "transfer: true HANYA bila transaksi memindahkan dana antar rekening/dompet MILIK SENDIRI atau " +
+        "isi-ulang saldo (mis. 'Top Up GoPay', 'Transfer ke OVO', 'TRSF E-BANKING', 'Top up saldo', " +
+        "'Isi saldo'), termasuk biaya admin pasangannya — agar bisa diabaikan supaya tidak dobel hitung. " +
+        "Selain itu transfer = false.",
+      "Keluarkan HANYA JSON valid berbentuk persis:",
+      "{",
+      '  "type": "list",',
+      '  "transactions": [',
+      "    {",
+      '      "tx_type": "expense"|"income",',
+      '      "amount": number,',
+      '      "category": string|null,',
+      '      "date": "YYYY-MM-DD",',
+      '      "note": string,',
+      '      "transfer": boolean',
+      "    }",
+      "  ]",
+      "}",
+      "Jika input bukan mutasi/riwayat transaksi atau tidak terbaca, kembalikan transactions berupa array kosong.",
+    ].join("\n");
+  }
 
   if (mode === "receipt") {
     return [
