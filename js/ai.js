@@ -345,14 +345,42 @@ KK.ai = (function () {
 
   // ----------------------------------------------------------------- SCAN STRUK
   function openReceiptFlow() {
-    const input = u.el("input", { type: "file", accept: "image/*", style: "display:none" });
+    const m = u.openModal({ title: "📷 Scan Struk" });
+    renderReceiptChooser(m.body, m);
+  }
+
+  // Pilihan sumber gambar struk: kamera langsung atau galeri.
+  function renderReceiptChooser(host, m) {
+    u.clear(host);
+    const opt = (icon, title, desc, useCamera) => {
+      const b = u.el("button", { class: "ai-opt", type: "button" }, [
+        u.el("span", { class: "ai-opt-ic", text: icon }),
+        u.el("span", { class: "ai-opt-txt" }, [
+          u.el("span", { class: "ai-opt-title", text: title }),
+          u.el("span", { class: "ai-opt-desc", text: desc }),
+        ]),
+      ]);
+      b.addEventListener("click", () => pickReceiptImage(useCamera, host, m));
+      return b;
+    };
+    host.appendChild(u.el("div", { class: "ai-opts" }, [
+      opt("📷", "Kamera", "Foto struk langsung", true),
+      opt("🖼️", "Galeri", "Pilih foto tersimpan", false),
+    ]));
+    host.appendChild(u.el("div", { class: "ai-foot" }, [
+      u.el("button", { class: "btn btn-ghost", text: "Batal", onClick: () => m.close() }),
+    ]));
+  }
+
+  function pickReceiptImage(useCamera, host, m) {
+    const attrs = { type: "file", accept: "image/*", style: "display:none" };
+    if (useCamera) attrs.capture = "environment"; // buka kamera belakang langsung (HP)
+    const input = u.el("input", attrs);
     document.body.appendChild(input);
     input.addEventListener("change", () => {
       const file = input.files && input.files[0];
       input.remove();
-      if (!file) return;
-      const m = u.openModal({ title: "📷 Scan Struk" });
-      const host = m.body;
+      if (!file) return; // batal memilih -> pemilih sumber tetap tampil
       processAndReview(host, m, "Membaca struk…",
         async () => {
           // Hemat token gambar: turunkan resolusi (1600->1200) & kualitas (0.82->0.7).
