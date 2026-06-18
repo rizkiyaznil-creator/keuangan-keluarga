@@ -7,6 +7,7 @@ window.KK = window.KK || {};
 (function () {
   var u = KK.util;
   var DISMISS_KEY = "kk_install_hint_dismissed";
+  var POPUP_KEY = "kk_install_popup_until"; // tahan pop-up sampai timestamp ini
   var bannerEl = null;
 
   function isStandalone() {
@@ -23,6 +24,12 @@ window.KK = window.KK || {};
   }
   function setDismissed() {
     try { localStorage.setItem(DISMISS_KEY, "1"); } catch (e) {}
+  }
+  function popupSuppressed() {
+    try { var v = localStorage.getItem(POPUP_KEY); return !!v && Date.now() < Number(v); } catch (e) { return false; }
+  }
+  function suppressPopup() {
+    try { localStorage.setItem(POPUP_KEY, String(Date.now() + 14 * 864e5)); } catch (e) {} // 14 hari
   }
 
   function svg(paths) {
@@ -122,6 +129,43 @@ window.KK = window.KK || {};
     });
   }
 
+  // Pop-up modal yang lebih menonjol, muncul otomatis sekali saat app dibuka di
+  // browser. Ditahan 14 hari bila ditutup (cara apa pun); tak muncul bila sudah terpasang.
+  function showInstallPopup() {
+    if (isStandalone() || popupSuppressed()) return;
+    var dp = window.__kkDeferredPrompt;
+    if (dp && dp.prompt && !isIos()) {
+      u.openModal({
+        title: "Pasang Aplikasi",
+        body: u.el("div", { class: "install-help" }, [
+          u.el("p", { text: "Pasang ke layar utama agar terbuka lebih cepat, tampil layar penuh, dan tetap bisa dibuka saat offline." }),
+        ]),
+        onClose: suppressPopup,
+        actions: [
+          { label: "Nanti saja", class: "btn-ghost", onClick: function (c) { c(); } },
+          { label: "📲 Pasang", class: "btn-primary", onClick: function (c) {
+              var d = window.__kkDeferredPrompt;
+              if (d && d.prompt) {
+                d.prompt();
+                (d.userChoice || Promise.resolve()).then(function (res) {
+                  window.__kkDeferredPrompt = null;
+                  if (res && res.outcome === "accepted") { setDismissed(); removeBanner(); }
+                });
+              }
+              c();
+            } },
+        ],
+      });
+    } else {
+      u.openModal({
+        title: "Pasang Aplikasi",
+        body: isIos() ? iosHelpBody() : genericHelpBody(),
+        onClose: suppressPopup,
+        actions: [{ label: "Mengerti", class: "btn-primary", onClick: function (c) { c(); } }],
+      });
+    }
+  }
+
   KK.install = { promptInstall: promptInstall };
 
   function init() {
@@ -130,10 +174,13 @@ window.KK = window.KK || {};
     // Android / Chrome (termasuk desktop): tampilkan tombol Pasang saat tersedia.
     if (window.__kkDeferredPrompt) showAndroidBanner();
     window.addEventListener("kk-installable", showAndroidBanner);
-    window.addEventListener("appinstalled", function () { setDismissed(); removeBanner(); });
+    window.addEventListener("appinstalled", function () { setDismissed(); suppressPopup(); removeBanner(); });
 
     // iOS: tidak ada prompt otomatis -> tampilkan petunjuk manual.
     if (isIos() && !window.__kkDeferredPrompt) setTimeout(showIosBanner, 900);
+
+    // Pop-up modal yang lebih menonjol (selain banner) — sekali, ditahan 14 hari bila ditutup.
+    setTimeout(showInstallPopup, 1500);
   }
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
