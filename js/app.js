@@ -101,6 +101,9 @@ KK.app = (function () {
       buildShellForRole();
       showApp();
       showView("summary");
+
+      // Tawaran pasang aplikasi (pop-up) — hanya setelah berhasil masuk app.
+      setTimeout(function () { if (KK.install && KK.install.maybePopup) KK.install.maybePopup(); }, 1500);
     } catch (err) {
       u.toast(KK.auth.friendly(err), "error", 6000);
     }

@@ -166,7 +166,7 @@ window.KK = window.KK || {};
     }
   }
 
-  KK.install = { promptInstall: promptInstall };
+  KK.install = { promptInstall: promptInstall, maybePopup: showInstallPopup };
 
   function init() {
     if (isStandalone()) return; // sudah terpasang
@@ -179,8 +179,7 @@ window.KK = window.KK || {};
     // iOS: tidak ada prompt otomatis -> tampilkan petunjuk manual.
     if (isIos() && !window.__kkDeferredPrompt) setTimeout(showIosBanner, 900);
 
-    // Pop-up modal yang lebih menonjol (selain banner) — sekali, ditahan 14 hari bila ditutup.
-    setTimeout(showInstallPopup, 1500);
+    // Pop-up modal yang menonjol dipicu SETELAH LOGIN (lihat app.js enterApp -> KK.install.maybePopup).
   }
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
