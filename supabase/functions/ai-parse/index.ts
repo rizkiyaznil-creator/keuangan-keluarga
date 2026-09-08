@@ -360,7 +360,12 @@ function buildPrompt(
       "Anda asisten yang membaca STRUK BELANJA Indonesia dari gambar dan mengubahnya menjadi data JSON.",
       catBlock, moneyRule, dateRule, catRule,
       "Baca tiap baris ITEM belanja. Abaikan baris non-item (subtotal, total, tunai, kembalian, " +
-      "PPN, diskon, poin, NPWP, kasir, dll), kecuali untuk mengisi field store, date, dan total.",
+      "diskon, poin, NPWP, kasir, dll), kecuali untuk mengisi field store, date, dan total.",
+      "PENTING — PAJAK & LAYANAN: bila struk menambahkan PAJAK (PB1 / Pajak Restoran / PPN / Tax) " +
+      "dan/atau SERVICE CHARGE (biaya layanan) DI ATAS subtotal item, masukkan MASING-MASING sebagai " +
+      'baris item tersendiri (nama jelas: "Pajak (PB1)", "Service charge") dengan amount sesuai nominal ' +
+      "yang ditagihkan, sehingga jumlah seluruh baris mendekati TOTAL yang dibayar. " +
+      "Namun jika pajak sudah TERMASUK dalam harga item (total = subtotal), JANGAN menambah baris pajak.",
       "Keluarkan HANYA JSON valid dengan bentuk persis berikut:",
       "{",
       '  "type": "receipt",',
